@@ -108,15 +108,23 @@ describe('core CLI', () => {
   });
 
   describe('navigation', () => {
-    it('info', () => expect(gm('stripe', 'info')).toContain('customers'));
-    it('sub-resource info', () => expect(gm('stripe', 'customers', 'info')).toContain('sources'));
-    it('--help', () => expect(gm('stripe', '--help')).toContain('Usage:'));
-    it('resource --help', () => {
+    it('--help: shows resources and auth', () => {
+      const out = gm('stripe', '--help');
+      expect(out).toContain('Usage:');
+      expect(out).toContain('Resources:');
+      expect(out).toContain('STRIPE_API_KEY');
+    });
+    it('resource --help: shows operations and sub-resources', () => {
       const out = gm('stripe', 'customers', '--help');
       expect(out).toContain('list');
-      expect(out).toContain('Sub-resources:');
+      expect(out).toContain('create');
+      expect(out).toContain('Resources:');
     });
-    it('action filter', () => expect(gm('stripe', 'list', '--help')).toContain('customers'));
+    it('deep --help: navigates through params', () => {
+      const out = gm('stripe', 'customers', 'balance_transactions', '--help');
+      expect(out).toContain('balance_transactions');
+      expect(out).toContain('list');
+    });
   });
 
   describe('errors', () => {

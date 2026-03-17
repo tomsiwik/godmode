@@ -94,10 +94,8 @@ Setup:
   ...                         Run \x1b[2mgodmode add --help\x1b[0m for config format
 
 Navigation:
-  <api> info                  List available resources
-  <api> <resource> info       List sub-resources
-  <api> <resource> --help     Show actions for a resource
-  <api> <action> --help       Show resources supporting an action
+  <api> --help                Show resources, auth, and usage
+  <api> <resource> --help     Show operations and sub-resources
 
 Flags:
       --post                  POST
@@ -145,10 +143,18 @@ function buildTrie(routes: Route[]): TrieNode {
 function navigateTrie(root: TrieNode, segments: string[]): TrieNode | null {
   let node = root;
   for (const seg of segments) {
+    // Direct static child
     const staticChild = node.children.find((c) => !c.isParam && c.name === seg);
     if (staticChild) { node = staticChild; continue; }
+    // Check through param children (folding)
     const paramChild = node.children.find((c) => c.isParam);
-    if (paramChild) { node = paramChild; continue; }
+    if (paramChild) {
+      const nested = paramChild.children.find((c) => !c.isParam && c.name === seg);
+      if (nested) { node = nested; continue; }
+      // Treat as param value
+      node = paramChild;
+      continue;
+    }
     return null;
   }
   return node;
@@ -208,97 +214,71 @@ function formatColumns(items: string[], maxWidth = 76): string {
   return lines.join('\n');
 }
 
-/** `godmode stripe --help` — full usage guide */
-function showApiCommandHelp(manifest: Manifest, apiName: string) {
-  const name = manifest.config.name || apiName;
-  const ver = manifest.specVersion ? ` v${manifest.specVersion}` : '';
-  const desc = manifest.description || '';
-
-  console.log(`${name}${ver}${desc ? ' — ' + desc : ''}
-
-Usage:
-  godmode ${apiName} <resource> [id] [flags]
-  godmode ${apiName} /path [flags]
-
-Navigation:
-  info                        Resources
-  <resource> info             Sub-resources
-  <resource> --help           Actions
-  <action> --help             Filter by action (list, create, get, update, delete)
-
-Examples:
-  ${apiName} customers                          List
-  ${apiName} customers cus_123                  Get
-  ${apiName} customers --post -q email=a@b.com  Create
-  ${apiName} customers cus_123 -d               Delete
-  ${apiName} /v1/customers                      Raw path`);
-}
-
-/** `godmode stripe customers --help` — actions and sub-resources for a resource */
-function showResourceHelp(manifest: Manifest, apiName: string, path: string[]) {
+/** Unified --help at any level */
+function showHelp2(manifest: Manifest, apiName: string, path: string[]) {
   const root = buildTrie(manifest.routes);
   const node = navigateTrie(root, path);
   if (!node) { console.log('No matching resource.'); return; }
 
   const actions = getNodeActions(node);
   const param = getParamName(node);
-  const summary = getNodeSummary(node);
-  const resourceName = path.join(' ');
   const children = getChildren(node).filter((c) => !c.isParam);
   const childNames = [...new Set(children.map((c) => c.name))];
+  const resourceName = path.join(' ');
 
-  console.log(`${resourceName}${summary ? ' — ' + summary : ''}\n`);
+  // Header
+  if (!path.length) {
+    const name = manifest.config.name || apiName;
+    const ver = manifest.specVersion ? ` \x1b[2mv${manifest.specVersion}\x1b[0m` : '';
+    const desc = manifest.description ? `\n\x1b[2m${manifest.description}\x1b[0m` : '';
+    console.log(`${name}${ver}${desc}\n`);
+    console.log(`Usage:\n  godmode ${apiName} <resource> [id] [flags]\n`);
 
+    const auth = manifest.config.auth;
+    if (auth?.env) {
+      const type = auth.type || 'bearer';
+      const set = process.env[auth.env] ? '\x1b[32mset\x1b[0m' : '\x1b[31mnot set\x1b[0m';
+      console.log(`Auth: ${type} via ${auth.env} (${set})\n`);
+    }
+  } else {
+    const summary = getNodeSummary(node);
+    console.log(`Usage:\n  godmode ${apiName} ${resourceName} <operation> [parameters...]\n`);
+    if (summary) console.log(`${summary}\n`);
+  }
+
+  // Actions
   if (actions.length) {
-    console.log('Actions:');
+    console.log('Available operations:');
     const ref = param ? ` <${param}>` : '';
-    const base = `godmode ${apiName} ${resourceName}`;
     for (const a of actions) {
-      let ex: string;
+      let usage = '';
       switch (a) {
-        case 'list':   ex = base; break;
-        case 'get':    ex = `${base}${ref}`; break;
-        case 'create': ex = `${base} --post -q key=val`; break;
-        case 'update': ex = `${base}${ref} --post -q key=val`; break;
-        case 'delete': ex = `${base}${ref} -d`; break;
-        default:       ex = base;
+        case 'list':   usage = `godmode ${apiName} ${resourceName}`.trim(); break;
+        case 'get':    usage = `godmode ${apiName} ${resourceName}${ref}`.trim(); break;
+        case 'create': usage = `godmode ${apiName} ${resourceName} --post -q key=val`.trim(); break;
+        case 'update': usage = `godmode ${apiName} ${resourceName}${ref} --post -q key=val`.trim(); break;
+        case 'delete': usage = `godmode ${apiName} ${resourceName}${ref} -d`.trim(); break;
+        default:       usage = '';
       }
-      console.log(`  ${a.padEnd(22)}${ex}`);
+      console.log(`  ${a.padEnd(24)}${usage}`);
     }
   }
 
+  // Sub-resources
   if (childNames.length) {
-    console.log('\nSub-resources:');
-    console.log(formatColumns(childNames));
+    const shown = childNames.slice(0, 5);
+    const more = childNames.length > 5 ? childNames.length - 5 : 0;
+    console.log(`\nResources:`);
+    for (const name of shown) {
+      const child = children.find((c) => c.name === name);
+      const childActions = child ? getNodeActions(child) : [];
+      const ops = childActions.length ? `(${childActions.join(', ')})` : '';
+      console.log(`  ${name.padEnd(28)}${ops}`);
+    }
+    if (more) console.log(`  ...                         ${more} more — run "godmode ${apiName} ${resourceName} <resource> --help"`);
   }
-}
 
-/** `godmode stripe info` — list resource names */
-function showResources(manifest: Manifest, path: string[]) {
-  const root = buildTrie(manifest.routes);
-  const node = navigateTrie(root, path);
-  if (!node) { console.log('No matching resource.'); return; }
-
-  const children = getChildren(node).filter((c) => !c.isParam);
-  const names = [...new Set(children.map((c) => c.name))];
-  if (!names.length) { console.log('No sub-resources.'); return; }
-  console.log(formatColumns(names));
-}
-
-/** `godmode stripe list --help` — resources supporting an action */
-function showActionResources(manifest: Manifest, path: string[], action: string) {
-  const root = buildTrie(manifest.routes);
-  const node = navigateTrie(root, path);
-  if (!node) { console.log('No matching resource.'); return; }
-
-  const children = getChildren(node).filter((c) => !c.isParam);
-  const names: string[] = [];
-  for (const child of children) {
-    if (getNodeActions(child).includes(action)) names.push(child.name);
-  }
-  const unique = [...new Set(names)];
-  if (!unique.length) { console.log(`No resources with "${action}".`); return; }
-  console.log(formatColumns(unique));
+  console.log(`\nUse "godmode ${apiName} ${resourceName ? resourceName + ' ' : ''}<resource> --help" for more.`);
 }
 
 // ── main ────────────────────────────────────────────────────
@@ -378,30 +358,9 @@ Example:
   const parsed = parseArgs(args.slice(1));
   const manifest = await loadManifest(apiName);
 
-  // `godmode stripe info` or `godmode stripe customers info`
-  const lastSeg = parsed.segments[parsed.segments.length - 1];
-  if (lastSeg === 'info') {
-    showResources(manifest, parsed.segments.slice(0, -1));
-    return;
-  }
-
-  // `godmode stripe --help` → full usage guide
-  // `godmode stripe customers --help` → resource-specific help
-  // `godmode stripe list --help` → resources supporting that action
-  if (parsed.help) {
-    if (lastSeg && ACTIONS.has(lastSeg)) {
-      showActionResources(manifest, parsed.segments.slice(0, -1), lastSeg);
-    } else if (parsed.segments.length) {
-      showResourceHelp(manifest, apiName, parsed.segments);
-    } else {
-      showApiCommandHelp(manifest, apiName);
-    }
-    return;
-  }
-
-  // No segments → full usage guide
-  if (!parsed.segments.length) {
-    showApiCommandHelp(manifest, apiName);
+  // --help at any level
+  if (parsed.help || !parsed.segments.length) {
+    showHelp2(manifest, apiName, parsed.segments);
     return;
   }
 
