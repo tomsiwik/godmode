@@ -1,0 +1,7 @@
+name: Stripe
+description: Payment processing platform
+type: api
+spec: https://raw.githubusercontent.com/stripe/openapi/refs/heads/master/latest/openapi.spec3.yaml
+url: https://api.stripe.com
+auth:
+  env: STRIPE_API_KEY

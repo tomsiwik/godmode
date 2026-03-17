@@ -1,0 +1,7 @@
+name: GitHub
+description: GitHub REST API
+type: api
+spec: https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json
+url: https://api.github.com
+auth:
+  env: GITHUB_TOKEN
