@@ -1,5 +1,6 @@
 import { parseOpenApi } from './protocols/api.js';
 import { parseGraphQL } from './protocols/graphql.js';
+import { parseMcp } from './protocols/mcp.js';
 
 // ── types ───────────────────────────────────────────────────
 
@@ -17,7 +18,7 @@ export interface VersionConfig {
 export interface ApiConfig {
   name?: string;
   description?: string;
-  type: 'api' | 'graphql';
+  type: 'api' | 'graphql' | 'mcp';
   spec?: string;
   url: string;
   prefix?: string;
@@ -55,6 +56,7 @@ export interface Manifest {
 const parsers: Record<string, (name: string, config: ApiConfig) => Promise<Manifest>> = {
   api: parseOpenApi,
   graphql: parseGraphQL,
+  mcp: parseMcp,
 };
 
 export async function parseSpec(name: string, config: ApiConfig): Promise<Manifest> {

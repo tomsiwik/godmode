@@ -46,11 +46,12 @@ export async function addApi(input: string) {
   const { name, config } = await resolveConfig(input);
 
   const type = config.type || 'api';
-  if (type !== 'api' && type !== 'graphql') throw new Error(`Unsupported type "${type}" — supported: api, graphql`);
+  if (!['api', 'graphql', 'mcp'].includes(type)) throw new Error(`Unsupported type "${type}" — supported: api, graphql, mcp`);
   config.type = type;
 
   if (type === 'api' && !config.spec) throw new Error('Config missing "spec" (OpenAPI spec URL or path)');
   if (type === 'graphql' && !config.spec && !config.url) throw new Error('GraphQL config needs "spec" (SDL) or "url" (for introspection)');
+  if (type === 'mcp' && !config.url) throw new Error('MCP config needs "url" (MCP endpoint)');
   if (!config.url && type === 'api') process.stderr.write('Warning: no "url" in config — will try to detect from spec\n');
 
   const manifest = await parseSpec(name, config);

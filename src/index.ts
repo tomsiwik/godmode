@@ -3,6 +3,7 @@ import { addApi, removeApi, updateApi, listApis, loadManifest } from './config.j
 import { matchRoute, suggestRoutes } from './match.js';
 import { execute } from './request.js';
 import { validateGraphQLFlags } from './protocols/graphql.js';
+import { validateMcpFlags, executeMcpTool } from './protocols/mcp.js';
 import type { Manifest, Route } from './spec.js';
 
 loadEnv();
@@ -256,14 +257,17 @@ function formatColumns(items: string[], maxWidth = 76): string {
 
 import fuzzysort from 'fuzzysort';
 
-// Method labels — Swagger UI colors, small caps unicode
+// Method labels — bold + Swagger UI colors
 const METHOD_LABEL: Record<string, string> = {
-  get:    '\x1b[38;5;34mɢᴇᴛ\x1b[0m',      // green
-  post:   '\x1b[38;5;25mᴘᴏꜱᴛ\x1b[0m',     // blue
-  put:    '\x1b[38;5;172mᴘᴜᴛ\x1b[0m',     // orange
-  patch:  '\x1b[38;5;30mᴘᴀᴛᴄʜ\x1b[0m',    // teal
-  delete: '\x1b[38;5;160mᴅᴇʟᴇᴛᴇ\x1b[0m',  // red
+  get:    '\x1b[1;38;5;34mGET\x1b[0m',       // green
+  post:   '\x1b[1;38;5;25mPOST\x1b[0m',      // blue
+  put:    '\x1b[1;38;5;172mPUT\x1b[0m',      // orange
+  patch:  '\x1b[1;38;5;30mPATCH\x1b[0m',     // teal
+  delete: '\x1b[1;38;5;160mDELETE\x1b[0m',   // red
 };
+const DIM = '\x1b[2m';
+const ITALIC = '\x1b[3m';
+const RESET = '\x1b[0m';
 
 function methodLabels(node: TrieNode): string {
   // Collect actual HTTP methods from this node + folded param child
@@ -322,46 +326,69 @@ function showHelp2(manifest: Manifest, apiName: string, path: string[], filter?:
     }
     console.log('');
 
-    const order = ['get', 'post', 'put', 'patch', 'delete'] as const;
-    const pc = node.children.find((c) => c.isParam);
-    const paramRef = pc ? `<${pc.name}>` : '';
+    // MCP tools: show input params from schema
+    const mcpTools = (manifest.config as any)._mcpTools as Array<{ name: string; description?: string; inputSchema?: any }> | undefined;
+    const mcpTool = mcpTools?.find((t) => t.name === path[path.length - 1]);
 
-    // Collect endpoints grouped by collection vs resource
-    const rows: Array<{ method: string; summary: string; needsId: boolean }> = [];
-    for (const ep of node.methods) {
-      rows.push({ method: ep.method, summary: ep.summary, needsId: false });
-    }
-    if (pc) {
-      for (const ep of pc.methods) {
-        rows.push({ method: ep.method, summary: ep.summary, needsId: true });
+    if (mcpTool?.inputSchema?.properties) {
+      const props = mcpTool.inputSchema.properties as Record<string, { type: string; description?: string }>;
+      const required = new Set<string>(mcpTool.inputSchema.required || []);
+      const toolName = mcpTool.name;
+
+      if (mcpTool.description) {
+        const first = mcpTool.description.split('\n')[0];
+        console.log(`${ITALIC}${first}${RESET}\n`);
       }
-    }
 
-    if (rows.length) {
-      const lastSeg = path[path.length - 1] || resourceName;
-      const base = lastSeg;
-      const lines: Array<{ cmd: string; label: string; desc: string }> = [];
+      console.log('Parameters:');
+      for (const [name, schema] of Object.entries(props)) {
+        const req = required.has(name) ? `\x1b[1;38;5;160m[REQUIRED]${RESET} ` : '';
+        const desc = schema.description ? `${DIM}${ITALIC}${schema.description}${RESET}` : '';
+        console.log(`  ${name.padEnd(28)}${req}${desc}`);
+      }
+      console.log('');
+      console.log(`Example:\n  godmode ${apiName} ${toolName} ${[...required].map((r) => `${r}=...`).join(' ')}`);
+      console.log('');
+    } else {
+      // REST: show method table
+      const order = ['get', 'post', 'put', 'patch', 'delete'] as const;
+      const pc = node.children.find((c) => c.isParam);
 
-      for (const m of order) {
-        for (const r of rows.filter((r) => r.method === m)) {
-          const id = r.needsId ? ` <${pc!.name}>` : '';
-          let suffix = '';
-          if (m === 'post' || m === 'put' || m === 'patch') suffix = ' key=val';
-          if (m === 'delete') suffix = ' -d';
-          // For non-default methods on collection, add flag
-          const needsFlag = (!r.needsId && m !== 'get' && m !== 'post') || (r.needsId && m === 'post');
-          const flag = needsFlag ? ` -${m === 'post' ? 'po' : m === 'put' ? 'pu' : m === 'patch' ? 'pa' : ''}` : '';
-          const cmd = `${base}${id}${suffix}${flag}`.trim();
-          lines.push({ cmd, label: METHOD_LABEL[m] || m, desc: r.summary || '' });
+      const rows: Array<{ method: string; summary: string; needsId: boolean }> = [];
+      for (const ep of node.methods) {
+        rows.push({ method: ep.method, summary: ep.summary, needsId: false });
+      }
+      if (pc) {
+        for (const ep of pc.methods) {
+          rows.push({ method: ep.method, summary: ep.summary, needsId: true });
         }
       }
 
-      const maxCmd = Math.max(...lines.map((l) => l.cmd.length));
-      for (const l of lines) {
-        const desc = l.desc ? `  \x1b[2m${l.desc}\x1b[0m` : '';
-        console.log(`  ${l.cmd.padEnd(maxCmd + 2)}${l.label}${desc}`);
+      if (rows.length) {
+        const lastSeg = path[path.length - 1] || resourceName;
+        const base = lastSeg;
+        const lines: Array<{ cmd: string; label: string; desc: string }> = [];
+
+        for (const m of order) {
+          for (const r of rows.filter((r) => r.method === m)) {
+            const id = r.needsId ? ` <${pc!.name}>` : '';
+            let suffix = '';
+            if (m === 'post' || m === 'put' || m === 'patch') suffix = ' key=val';
+            if (m === 'delete') suffix = ' -d';
+            const needsFlag = (!r.needsId && m !== 'get' && m !== 'post') || (r.needsId && m === 'post');
+            const flag = needsFlag ? ` -${m === 'post' ? 'po' : m === 'put' ? 'pu' : m === 'patch' ? 'pa' : ''}` : '';
+            const cmd = `${base}${id}${suffix}${flag}`.trim();
+            lines.push({ cmd, label: METHOD_LABEL[m] || m, desc: r.summary || '' });
+          }
+        }
+
+        const maxCmd = Math.max(...lines.map((l) => l.cmd.length));
+        for (const l of lines) {
+          const desc = l.desc ? `  ${ITALIC}${l.desc}${RESET}` : '';
+          console.log(`  ${l.cmd.padEnd(maxCmd + 2)}${l.label}${desc}`);
+        }
+        console.log('');
       }
-      console.log('');
     }
   }
 
@@ -412,10 +439,10 @@ function showHelp2(manifest: Manifest, apiName: string, path: string[], filter?:
         const child = children.find((c) => c.name === n);
         const labels = child ? methodLabels(child) : '';
         const subCount = child ? getChildren(child).filter((c) => !c.isParam).length : 0;
-        const sub = subCount ? `  \x1b[2m(${subCount} sub)\x1b[0m` : '';
+        const sub = subCount ? `  ${DIM}(${subCount} sub)${RESET}` : '';
         const rawDesc = manifest.resourceDescriptions[n] || '';
         const truncated = rawDesc.length > 60 ? rawDesc.slice(0, 57) + '...' : rawDesc;
-        const descStr = truncated ? `  \x1b[2m${truncated}\x1b[0m` : '';
+        const descStr = truncated ? `  ${ITALIC}${truncated}${RESET}` : '';
         console.log(`  ${n.padEnd(28)}${labels}${sub}${descStr}`);
       }
 
@@ -516,6 +543,20 @@ Example:
   if (manifest.config.type === 'graphql') {
     const err = validateGraphQLFlags(parsed.method, parsed.query, parsed.body, apiName);
     if (err) { process.stderr.write(err + '\n'); process.exit(1); }
+  }
+
+  if (manifest.config.type === 'mcp') {
+    const err = validateMcpFlags(parsed.method, parsed.query);
+    if (err) { process.stderr.write(err + '\n'); process.exit(1); }
+
+    // MCP: call tool directly
+    const toolName = parsed.segments[0];
+    const result = await executeMcpTool(manifest.config, toolName, parsed.body, {
+      verbose: parsed.verbose,
+      dryRun: parsed.dryRun,
+    });
+    if (result) process.stdout.write(result + '\n');
+    return;
   }
 
   // ── resolve query + body ──

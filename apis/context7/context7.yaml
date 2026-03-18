@@ -1,0 +1,6 @@
+name: Context7
+description: Up-to-date code documentation for LLMs
+type: mcp
+url: https://mcp.context7.com/mcp
+auth:
+  env: CONTEXT7_API_KEY
