@@ -1,3 +1,3 @@
-import { describeAdapter } from '../../test/adapter';
+import { testAdapter } from '../../test/adapter';
 
-describeAdapter('petstore', 'apis/petstore/petstore.yaml');
+testAdapter('petstore', 'apis/petstore/petstore.yaml');

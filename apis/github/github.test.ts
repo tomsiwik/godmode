@@ -1,3 +1,3 @@
-import { describeAdapter } from '../../test/adapter';
+import { testAdapter } from '../../test/adapter';
 
-describeAdapter('github', 'apis/github/github.yaml');
+testAdapter('github', 'apis/github/github.yaml');

@@ -1,3 +1,3 @@
-import { describeAdapter } from '../../test/adapter';
+import { testAdapter } from '../../test/adapter';
 
-describeAdapter('slack', 'apis/slack/slack.yaml');
+testAdapter('slack', 'apis/slack/slack.yaml');

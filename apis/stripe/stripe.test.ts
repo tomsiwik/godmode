@@ -1,3 +1,3 @@
-import { describeAdapter } from '../../test/adapter';
+import { testAdapter } from '../../test/adapter';
 
-describeAdapter('stripe', 'apis/stripe/stripe.yaml');
+testAdapter('stripe', 'apis/stripe/stripe.yaml');

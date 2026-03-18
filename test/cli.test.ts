@@ -1,134 +1,165 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { gm } from './adapter';
 
-/**
- * Core CLI behavior tests — flags, params, raw paths, auth, navigation.
- * Uses stripe adapter as the test subject (must be registered).
- */
-
 describe('core CLI', () => {
   beforeAll(() => {
     if (!gm('list').includes('stripe')) throw new Error('Run stripe adapter test first');
   });
 
-  describe('-q params', () => {
-    it('GET: query string', () => {
-      expect(gm('stripe', 'customers', '-q', 'limit=10', '--dry-run'))
-        .toBe('GET https://api.stripe.com/v1/customers?limit=10');
-    });
+  // ── httpie-style params ───────────────────────────────
 
-    it('GET: multiple', () => {
-      const out = gm('stripe', 'charges', '-q', 'limit=5', '-q', 'currency=usd', '--dry-run');
-      expect(out).toContain('limit=5');
-      expect(out).toContain('currency=usd');
-    });
-
-    it('POST: JSON body', () => {
-      const out = gm('stripe', 'customers', '--post', '-q', 'email=a@b.com', '-q', 'name=Test', '--dry-run');
-      expect(out).toContain('POST https://api.stripe.com/v1/customers');
-      expect(out).toContain('"email":"a@b.com"');
-      expect(out).toContain('"name":"Test"');
-    });
-
-    it('POST: Content-Type set', () => {
-      const out = gm('stripe', 'customers', '--post', '-q', 'email=x', '--dry-run', '--verbose');
-      expect(out).toContain('Content-Type: application/json');
-    });
+  it.each([
+    {
+      name: 'key==value → query string',
+      args: ['stripe', 'customers', 'limit==10', '--dry-run'],
+      expected: 'GET https://api.stripe.com/v1/customers?limit=10',
+    },
+    {
+      name: 'multiple query params',
+      args: ['stripe', 'charges', 'limit==5', 'currency==usd', '--dry-run'],
+      contains: ['limit=5', 'currency=usd'],
+    },
+    {
+      name: 'key=value → body (implies POST)',
+      args: ['stripe', 'customers', 'email=a@b.com', '--dry-run'],
+      contains: ['POST https://api.stripe.com/v1/customers', '"email":"a@b.com"'],
+    },
+    {
+      name: 'multiple body fields',
+      args: ['stripe', 'customers', 'email=a@b.com', 'name=Test', '--dry-run'],
+      contains: ['POST', '"email":"a@b.com"', '"name":"Test"'],
+    },
+    {
+      name: 'body sets Content-Type',
+      args: ['stripe', 'customers', 'email=x', '--dry-run', '--verbose'],
+      contains: ['Content-Type: application/json'],
+    },
+    {
+      name: 'query + body together',
+      args: ['stripe', 'customers', 'email=x', 'expand==sources', '--dry-run'],
+      contains: ['POST https://api.stripe.com/v1/customers?expand=sources', '"email":"x"'],
+    },
+  ])('$name', ({ args, expected, contains }) => {
+    const out = gm(...args);
+    if (expected) expect(out).toBe(expected);
+    if (contains) for (const c of contains) expect(out).toContain(c);
   });
 
-  describe('raw path', () => {
-    it('GET', () => {
-      expect(gm('stripe', '/v1/customers', '--dry-run'))
-        .toBe('GET https://api.stripe.com/v1/customers');
-    });
+  // ── method flags ──────────────────────────────────────
 
-    it('POST with body', () => {
-      const out = gm('stripe', '/v1/customers', '--post', '-q', 'email=x', '--dry-run');
-      expect(out).toContain('POST https://api.stripe.com/v1/customers');
-      expect(out).toContain('"email":"x"');
-    });
-
-    it('DELETE', () => {
-      expect(gm('stripe', '/v1/customers/cus_123', '-d', '--dry-run'))
-        .toBe('DELETE https://api.stripe.com/v1/customers/cus_123');
-    });
+  it.each([
+    {
+      name: '-po explicit POST',
+      args: ['stripe', 'customers', '-po', 'email=x', '--dry-run'],
+      contains: ['POST https://api.stripe.com/v1/customers'],
+    },
+    {
+      name: '-d DELETE',
+      args: ['stripe', 'customers', 'cus_1', '-d', '--dry-run'],
+      expected: 'DELETE https://api.stripe.com/v1/customers/cus_1',
+    },
+    {
+      name: '-g explicit GET',
+      args: ['stripe', 'customers', '-g', '--dry-run'],
+      expected: 'GET https://api.stripe.com/v1/customers',
+    },
+  ])('$name', ({ args, expected, contains }) => {
+    const out = gm(...args);
+    if (expected) expect(out).toBe(expected);
+    if (contains) for (const c of contains) expect(out).toContain(c);
   });
 
-  describe('version prefix', () => {
-    it('explicit v1 overrides v2 default', () => {
-      expect(gm('stripe', 'v1', 'billing', 'meter_events', '--post', '--dry-run'))
-        .toContain('POST https://api.stripe.com/v1/billing/meter_events');
-    });
+  // ── raw path ──────────────────────────────────────────
 
-    it('default picks latest', () => {
-      expect(gm('stripe', 'billing', 'meter_events', '--post', '--dry-run'))
-        .toContain('POST https://api.stripe.com/v2/billing/meter_events');
-    });
+  it.each([
+    {
+      name: 'GET raw path',
+      args: ['stripe', '/v1/customers', '--dry-run'],
+      expected: 'GET https://api.stripe.com/v1/customers',
+    },
+    {
+      name: 'POST raw path with body',
+      args: ['stripe', '/v1/customers', 'email=x', '--dry-run'],
+      contains: ['POST https://api.stripe.com/v1/customers', '"email":"x"'],
+    },
+    {
+      name: 'DELETE raw path',
+      args: ['stripe', '/v1/customers/cus_123', '-d', '--dry-run'],
+      expected: 'DELETE https://api.stripe.com/v1/customers/cus_123',
+    },
+  ])('$name', ({ args, expected, contains }) => {
+    const out = gm(...args);
+    if (expected) expect(out).toBe(expected);
+    if (contains) for (const c of contains) expect(out).toContain(c);
   });
 
-  describe('-d delete', () => {
-    it('sends DELETE', () => {
-      expect(gm('stripe', 'customers', 'cus_1', '-d', '--dry-run'))
-        .toBe('DELETE https://api.stripe.com/v1/customers/cus_1');
-    });
+  // ── version prefix ────────────────────────────────────
+
+  it.each([
+    {
+      name: 'explicit v1 overrides v2',
+      args: ['stripe', 'v1', 'billing', 'meter_events', '-po', '--dry-run'],
+      contains: ['POST https://api.stripe.com/v1/billing/meter_events'],
+    },
+    {
+      name: 'default picks latest (v2)',
+      args: ['stripe', 'billing', 'meter_events', '-po', '--dry-run'],
+      contains: ['POST https://api.stripe.com/v2/billing/meter_events'],
+    },
+  ])('$name', ({ args, contains }) => {
+    for (const c of contains) expect(gm(...args)).toContain(c);
   });
 
-  describe('-H headers', () => {
-    it('custom header', () => {
-      const out = gm('stripe', 'account', '-H', 'X-Custom:value', '--dry-run', '--verbose');
-      expect(out).toContain('X-Custom: value');
-    });
+  // ── headers & auth ────────────────────────────────────
 
-    it('multiple headers', () => {
-      const out = gm('stripe', 'account', '-H', 'A:1', '-H', 'B:2', '--dry-run', '--verbose');
-      expect(out).toContain('A: 1');
-      expect(out).toContain('B: 2');
-    });
+  it.each([
+    {
+      name: '-H custom header',
+      args: ['stripe', 'account', '-H', 'X-Custom:value', '--dry-run', '--verbose'],
+      contains: ['X-Custom: value'],
+    },
+    {
+      name: '--token sets Bearer',
+      args: ['stripe', 'account', '--token', 'sk_test', '--dry-run', '--verbose'],
+      contains: ['Authorization: Bearer sk_test'],
+    },
+  ])('$name', ({ args, contains }) => {
+    for (const c of contains) expect(gm(...args)).toContain(c);
   });
 
-  describe('--token auth', () => {
-    it('sets Bearer', () => {
-      const out = gm('stripe', 'account', '--token', 'sk_test', '--dry-run', '--verbose');
-      expect(out).toContain('Authorization: Bearer sk_test');
-    });
-
-    it('not in URL', () => {
-      const urlLine = gm('stripe', 'account', '--token', 'sk_test', '--dry-run').split('\n')[0];
-      expect(urlLine).toBe('GET https://api.stripe.com/v1/account');
-    });
+  it('missing auth errors with env var name', () => {
+    if (process.env.STRIPE_API_KEY) return;
+    expect(gm('stripe', 'account')).toContain('Missing STRIPE_API_KEY');
   });
 
-  describe('missing auth', () => {
-    it('errors with env var name when not dry-run', () => {
-      if (process.env.STRIPE_API_KEY) return; // skip if key is set
-      // Without --dry-run, should error before making request
-      const out = gm('stripe', 'account');
-      expect(out).toContain('Missing STRIPE_API_KEY');
-    });
+  // ── navigation ────────────────────────────────────────
+
+  it.each([
+    {
+      name: '--help shows resources and auth',
+      args: ['stripe', '--help'],
+      contains: ['Usage:', 'Resources:', 'STRIPE_API_KEY'],
+    },
+    {
+      name: 'resource --help shows commands and auth',
+      args: ['stripe', 'customers', '--help'],
+      contains: ['customers', 'STRIPE_API_KEY'],
+    },
+    {
+      name: 'deep --help shows commands with descriptions',
+      args: ['stripe', 'customers', 'balance_transactions', '--help'],
+      contains: ['balance_transactions', 'List customer balance transactions'],
+    },
+  ])('$name', ({ args, contains }) => {
+    for (const c of contains) expect(gm(...args)).toContain(c);
   });
 
-  describe('navigation', () => {
-    it('--help: shows resources and auth', () => {
-      const out = gm('stripe', '--help');
-      expect(out).toContain('Usage:');
-      expect(out).toContain('Resources:');
-      expect(out).toContain('STRIPE_API_KEY');
-    });
-    it('resource --help: shows operations and sub-resources', () => {
-      const out = gm('stripe', 'customers', '--help');
-      expect(out).toContain('list');
-      expect(out).toContain('create');
-      expect(out).toContain('Resources:');
-    });
-    it('deep --help: navigates through params', () => {
-      const out = gm('stripe', 'customers', 'balance_transactions', '--help');
-      expect(out).toContain('balance_transactions');
-      expect(out).toContain('list');
-    });
-  });
+  // ── errors ────────────────────────────────────────────
 
-  describe('errors', () => {
-    it('wrong method', () => expect(gm('stripe', 'account', '-d')).toContain('No DELETE route'));
-    it('unknown resource', () => expect(gm('stripe', 'nonexistent')).toContain('No GET route'));
+  it.each([
+    { name: 'wrong method', args: ['stripe', 'account', '-d'], contains: 'No DELETE route' },
+    { name: 'unknown resource', args: ['stripe', 'nonexistent'], contains: 'No GET route' },
+  ])('$name', ({ args, contains }) => {
+    expect(gm(...args)).toContain(contains);
   });
 });

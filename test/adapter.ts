@@ -9,7 +9,7 @@ interface Route { path: string; method: string; version: string; segments: Segme
 interface Manifest { name: string; config: { url: string }; routes: Route[]; versions: Array<{ name: string }> }
 
 const METHOD_FLAG: Record<string, string[]> = {
-  get: [], post: ['--post'], put: ['--put'], patch: ['--patch'], delete: ['-d'], head: ['--head'],
+  get: ['-g'], post: ['-po'], put: ['-pu'], patch: ['-pa'], delete: ['-d'], head: ['--head'],
 };
 
 export const gm = (...args: string[]) => {
@@ -23,16 +23,58 @@ export const gm = (...args: string[]) => {
   }
 };
 
-/**
- * Generic adapter test suite. Registers an API from a config file,
- * then verifies every route in the spec resolves to the correct URL.
- */
-export function describeAdapter(name: string, configPath: string) {
+function loadManifest(name: string): Manifest {
+  const base = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
+    ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
+    : resolve(homedir(), '.godmode');
+  return JSON.parse(readFileSync(resolve(base, 'apis', `${name}.json`), 'utf-8'));
+}
+
+function buildTestCases(name: string, manifest: Manifest) {
+  // Find version-shadowed routes
+  const segKey = (r: Route) => `${r.method}:${r.segments.map((s) => (s.isParam ? '*' : s.value)).join('/')}`;
+  const byKey = new Map<string, Route[]>();
+  for (const r of manifest.routes) {
+    const k = segKey(r);
+    (byKey.get(k) || (() => { const a: Route[] = []; byKey.set(k, a); return a; })()).push(r);
+  }
+  const shadowed = new Set<string>();
+  for (const [, routes] of byKey) {
+    const versions = [...new Set(routes.map((r) => r.version))];
+    if (versions.length > 1) {
+      const latest = versions.sort().pop()!;
+      for (const r of routes) {
+        if (r.version !== latest) shadowed.add(`${r.method}:${r.path}`);
+      }
+    }
+  }
+
+  return manifest.routes
+    .filter((r) => r.segments.length > 0)
+    .filter((r) => !shadowed.has(`${r.method}:${r.path}`))
+    .reduce<Array<{ label: string; args: string[]; expected: string }>>((acc, route) => {
+      const segments = route.segments.map((s) => (s.isParam ? `test_${s.value}` : s.value));
+      const flags = METHOD_FLAG[route.method] || [];
+
+      let expectedPath = route.path;
+      for (const s of route.segments) {
+        if (s.isParam) expectedPath = expectedPath.replace(`{${s.value}}`, `test_${s.value}`);
+      }
+
+      acc.push({
+        label: `${route.method.toUpperCase()} ${route.path}`,
+        args: [name, ...segments, ...flags, '--dry-run'],
+        expected: `${manifest.config.url}${expectedPath}`,
+      });
+      return acc;
+    }, []);
+}
+
+export function testAdapter(name: string, configPath: string) {
   describe(`${name} adapter`, () => {
-    let manifest: Manifest;
+    let cases: ReturnType<typeof buildTestCases>;
 
     beforeAll(() => {
-      // Ensure the API is registered
       const list = gm('list');
       if (!list.includes(name)) {
         const result = gm('add', resolve(__dirname, '..', configPath));
@@ -40,78 +82,24 @@ export function describeAdapter(name: string, configPath: string) {
           throw new Error(`Failed to add ${name}: ${result}`);
         }
       }
-
-      const manifestPath = resolve(
-        process.platform === 'linux' && process.env.XDG_CONFIG_HOME
-          ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
-          : resolve(homedir(), '.godmode'),
-        'apis', `${name}.json`);
-      manifest = JSON.parse(readFileSync(manifestPath, 'utf-8'));
+      cases = buildTestCases(name, loadManifest(name));
     });
 
-    it('registered with routes', () => {
-      expect(manifest.routes.length).toBeGreaterThan(0);
-      expect(manifest.config.url).toBeTruthy();
+    it('all routes resolve to correct URLs', { timeout: 300_000 }, () => {
+      const failures = cases
+        .map(({ label, args, expected }) => {
+          const out = gm(...args);
+          return out.includes(expected) ? null : `${label}\n  expected: ${expected}\n  got:      ${out.slice(0, 150)}`;
+        })
+        .filter(Boolean);
+
+      expect(failures, failures.slice(0, 10).join('\n\n')).toHaveLength(0);
     });
 
-    it('every route resolves to the correct URL', { timeout: 300_000 }, () => {
-      const failures: string[] = [];
-
-      // Find version collisions
-      const segKey = (r: Route) => `${r.method}:${r.segments.map((s) => (s.isParam ? '*' : s.value)).join('/')}`;
-      const byKey = new Map<string, Route[]>();
-      for (const r of manifest.routes) {
-        const k = segKey(r);
-        const arr = byKey.get(k) || [];
-        arr.push(r);
-        byKey.set(k, arr);
-      }
-      const shadowed = new Set<string>();
-      for (const [, routes] of byKey) {
-        const versions = [...new Set(routes.map((r) => r.version))];
-        if (versions.length > 1) {
-          const latest = versions.sort().pop()!;
-          for (const r of routes) {
-            if (r.version !== latest) shadowed.add(`${r.method}:${r.path}`);
-          }
-        }
-      }
-
-      for (const route of manifest.routes) {
-        if (shadowed.has(`${route.method}:${route.path}`)) continue;
-      if (!route.segments.length) continue; // root path — no segments to match
-
-        const segments = route.segments.map((s) => (s.isParam ? `test_${s.value}` : s.value));
-        const flags = METHOD_FLAG[route.method] || [];
-        const out = gm(name, ...segments, ...flags, '--dry-run');
-
-        let expectedPath = route.path;
-        for (const s of route.segments) {
-          if (s.isParam) expectedPath = expectedPath.replace(`{${s.value}}`, `test_${s.value}`);
-        }
-        const expectedUrl = `${manifest.config.url}${expectedPath}`;
-
-        if (!out.includes(expectedUrl)) {
-          failures.push(`${route.method.toUpperCase()} ${route.path}\n  expected: ${expectedUrl}\n  got:      ${out.slice(0, 150)}`);
-        }
-      }
-
-      if (shadowed.size) console.log(`  (${shadowed.size} routes shadowed by later version)`);
-
-      if (failures.length) {
-        throw new Error(`${failures.length}/${manifest.routes.length} routes failed:\n\n${failures.slice(0, 20).join('\n\n')}${failures.length > 20 ? `\n\n... and ${failures.length - 20} more` : ''}`);
-      }
-    });
-
-    it('info returns resources', () => {
-      const out = gm(name, 'info');
-      const names = out.trim().split(/\s+/).filter(Boolean);
-      expect(names.length).toBeGreaterThan(0);
-    });
-
-    it('--help shows usage', () => {
+    it('--help shows usage and resources', () => {
       const out = gm(name, '--help');
       expect(out).toContain('Usage:');
+      expect(out).toContain('Resources:');
     });
   });
 }

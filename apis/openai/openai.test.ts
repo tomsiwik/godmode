@@ -1,3 +1,3 @@
-import { describeAdapter } from '../../test/adapter';
+import { testAdapter } from '../../test/adapter';
 
-describeAdapter('openai', 'apis/openai/openai.yaml');
+testAdapter('openai', 'apis/openai/openai.yaml');
