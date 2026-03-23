@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="assets/logo_placeholder.svg?sanitize=1" alt="godmode" width="100" height="100" />
+  <img src="assets/logo.svg?sanitize=1" alt="godmode" width="100" height="100" />
 </p>
 
 <h2 align="center">Godmode</h2>

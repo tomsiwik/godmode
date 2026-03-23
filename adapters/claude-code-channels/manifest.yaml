@@ -1,0 +1,4 @@
+slug: claude-code-channels
+name: Claude Code Channels
+description: Inter-session messaging for Claude Code instances
+type: channels

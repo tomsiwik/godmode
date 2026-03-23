@@ -1,0 +1,27 @@
+---
+title: Flags Reference
+description: CLI flags and options
+---
+
+## HTTP Methods
+
+| Flag | Method |
+|------|--------|
+| (default) | GET |
+| `-po`, `--post` | POST |
+| `-pu`, `--put` | PUT |
+| `-pa`, `--patch` | PATCH |
+| `-d`, `--delete` | DELETE |
+| `-g`, `--get` | GET (explicit) |
+
+## Options
+
+| Flag | Description |
+|------|-------------|
+| `-H <key:value>` | Add header |
+| `--token <tok>` | Auth token (overrides .env) |
+| `--dry-run` | Preview request without sending |
+| `-v`, `--verbose` | Show full request/response |
+| `--filter <term>` | Fuzzy filter resources in --help |
+| `--method <method>` | Filter resources by HTTP method |
+| `--all` | Show all resources (no truncation) |

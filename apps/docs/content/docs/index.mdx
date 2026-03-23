@@ -1,0 +1,43 @@
+---
+title: Getting Started
+description: Turn any API into a CLI
+icon: Rocket
+---
+
+## Installation
+
+```bash
+npm install -g @godmode/cli
+```
+
+## Quick Start
+
+Create a config or use the interactive wizard:
+
+```bash
+godmode create
+```
+
+Or write a config manually:
+
+```yaml
+name: Stripe
+type: api
+spec: https://raw.githubusercontent.com/stripe/openapi/.../openapi.spec3.yaml
+url: https://api.stripe.com
+auth:
+  env: STRIPE_API_KEY
+```
+
+```bash
+godmode add stripe
+godmode stripe --help
+```
+
+## Supported Protocols
+
+| Type | Config | Discovery |
+|------|--------|-----------|
+| REST / OpenAPI | `type: api` | Parses OpenAPI spec |
+| GraphQL | `type: graphql` | Introspection or SDL file |
+| MCP | `type: mcp` | `tools/list` via JSON-RPC |

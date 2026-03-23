@@ -1,0 +1,32 @@
+---
+title: Tools
+description: How MCP tools become CLI commands
+---
+
+## Discovery
+
+When you `godmode add` an MCP server, it introspects the available tools via `tools/list`. Each tool becomes a CLI command.
+
+## Parameters
+
+Tool parameters are passed as `key=value`:
+
+```bash
+godmode context7 resolve-library-id libraryName=react query=hooks
+godmode context7 query-docs libraryId=/reactjs/react.dev query="useEffect examples"
+```
+
+## --help
+
+Tool-level help shows the parameter schema from the MCP server:
+
+```bash
+godmode context7 resolve-library-id --help
+```
+
+Shows parameter names, types (`STRING!` for required), and descriptions.
+
+## Validation
+
+- MCP tools are always POST — method flags like `--put`, `--delete` will error
+- Query params (`key==value`) will error — MCP uses body params only

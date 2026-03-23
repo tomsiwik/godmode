@@ -1,0 +1,35 @@
+---
+title: Getting Started
+description: REST / OpenAPI protocol support
+icon: Globe
+---
+
+## Overview
+
+Godmode parses any OpenAPI spec and turns it into a CLI. Version prefixes are auto-detected, routes are matched by path segments.
+
+## Config
+
+```yaml
+name: Stripe
+type: api
+spec: https://raw.githubusercontent.com/stripe/openapi/.../openapi.spec3.yaml
+url: https://api.stripe.com
+auth:
+  env: STRIPE_API_KEY
+```
+
+## Register
+
+```bash
+godmode add stripe
+```
+
+## Explore
+
+```bash
+godmode stripe --help
+godmode stripe customers --help
+godmode stripe --help --filter pay
+godmode stripe --help --method delete
+```

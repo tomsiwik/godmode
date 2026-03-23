@@ -1,0 +1,33 @@
+@import "fumadocs-ui/css/shadcn.css";
+@import "fumadocs-ui/css/preset.css";
+
+@import "@godmode/ui/styles/globals.css";
+
+@source "../../node_modules/@godmode/ui";
+
+:root {
+  --fd-layout-width: 90rem;
+  --fd-scroll-offset: 24px;
+}
+
+@layer base {
+  #nd-sidebar {
+    background-color: var(--color-background) !important;
+  }
+
+  .scroll-m-20 {
+    scroll-margin-top: calc(
+      var(--fd-scroll-offset, 0px) + var(--spacing) * 24
+    ) !important;
+  }
+  .scroll-m-24 {
+    scroll-margin-top: calc(
+      var(--fd-scroll-offset, 0px) + var(--spacing) * 28
+    ) !important;
+  }
+  .scroll-m-28 {
+    scroll-margin-top: calc(
+      var(--fd-scroll-offset, 0px) + var(--spacing) * 32
+    ) !important;
+  }
+}

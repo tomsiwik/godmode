@@ -1,0 +1,38 @@
+---
+title: Getting Started
+description: Model Context Protocol support
+icon: Zap
+---
+
+## Overview
+
+Godmode connects to any MCP server and turns its tools into CLI commands. Discovery happens via the MCP `tools/list` JSON-RPC call — no spec file needed.
+
+## Config
+
+```yaml
+name: Context7
+type: mcp
+url: https://mcp.context7.com/mcp
+auth:
+  env: CONTEXT7_API_KEY
+```
+
+## Register
+
+```bash
+godmode add context7
+```
+
+Godmode will:
+1. Send `initialize` to the MCP endpoint
+2. Call `tools/list` to discover available tools
+3. Build the CLI manifest from tool definitions
+
+## Use
+
+```bash
+godmode context7 --help
+godmode context7 resolve-library-id --help
+godmode context7 resolve-library-id libraryName=react query=hooks
+```

@@ -1,0 +1,14 @@
+{
+  "name": "@godmode-cli/slack",
+  "version": "0.0.1",
+  "type": "module",
+  "exports": { "./manifest": "./manifest.yaml" },
+  "files": ["manifest.yaml"],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@godmode-cli/cli": "workspace:*",
+    "vitest": "^4.1.0"
+  }
+}
