@@ -2,93 +2,89 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Cron } from 'croner';
-import { watch } from 'node:fs';
-import { readdir, readFile, writeFile, unlink, mkdir } from 'node:fs/promises';
+import { readdir, unlink } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
-import { randomUUID } from 'node:crypto';
-
-// ── types ───────────────────────────────────────────────────
-
-// Minimal type imports to avoid depending on @godmode-cli/cli
-interface ApiConfig {
-  slug?: string;
-  name?: string;
-  description?: string;
-  type: string;
-  url?: string;
-  [key: string]: any;
-}
-
-interface Segment { value: string; isParam: boolean }
-interface Route { path: string; method: string; summary: string; version: string; tag?: string; segments: Segment[] }
-interface Manifest {
-  name: string; description: string; specVersion: string;
-  config: ApiConfig; versions: any[]; resourceDescriptions: Record<string, string>; routes: Route[];
-}
-
-type Msg = { from: string; text: string; ts: number };
-type ScheduledJob = { id: string; to: string; text: string; cron: string; job: Cron };
 
 // ── constants ───────────────────────────────────────────────
 
 const HOME = homedir();
 const SESSIONS_DIR = join(HOME, '.claude', 'sessions');
-const MAILBOX_ROOT = join(HOME, '.claude', 'channels', 'ccchat');
 
+type Msg = { from: string; text: string; ts: number };
+type ScheduledJob = { id: string; to: string; text: string; cron: string; job: Cron };
 const jobs: ScheduledJob[] = [];
 
 // ── session discovery ───────────────────────────────────────
 
-async function findSessionId(): Promise<string> {
-  const ppid = process.ppid;
+function pidFromSession(filename: string): string {
+  return filename.replace(/\.(json|sock)$/, '');
+}
+
+async function findPid(): Promise<string> {
+  const ppid = String(process.ppid);
   const directPath = join(SESSIONS_DIR, `${ppid}.json`);
-  try {
-    const data = JSON.parse(await readFile(directPath, 'utf-8'));
-    return data.sessionId;
-  } catch {}
+  const file = Bun.file(directPath);
+  if (await file.exists()) return ppid;
 
   for (const f of await readdir(SESSIONS_DIR).catch(() => [] as string[])) {
     if (!f.endsWith('.json')) continue;
     try {
-      const data = JSON.parse(await readFile(join(SESSIONS_DIR, f), 'utf-8'));
-      if (data.pid === ppid) return data.sessionId;
+      const data = await Bun.file(join(SESSIONS_DIR, f)).json();
+      if (data.pid === process.ppid) return pidFromSession(f);
     } catch {}
   }
-  return randomUUID();
+
+  throw new Error(`Could not find Claude Code session for pid ${ppid}`);
 }
 
-let _sessionId: string | undefined;
-async function getSessionId(): Promise<string> {
-  if (!_sessionId) _sessionId = await findSessionId();
-  return _sessionId;
+// ── socket paths ────────────────────────────────────────────
+
+function socketPath(pid: string): string {
+  return join(SESSIONS_DIR, `${pid}.sock`);
 }
 
-// ── peer management ─────────────────────────────────────────
+// ── peer discovery ──────────────────────────────────────────
 
-async function getPeers(sessionId: string): Promise<string[]> {
-  const entries = await readdir(MAILBOX_ROOT).catch(() => [] as string[]);
-  return entries.filter(e => e !== sessionId && !e.startsWith('.'));
+async function getPeers(myPid: string): Promise<string[]> {
+  const entries = await readdir(SESSIONS_DIR).catch(() => [] as string[]);
+  return entries
+    .filter(e => e.endsWith('.sock') && pidFromSession(e) !== myPid)
+    .map(e => pidFromSession(e));
 }
 
-async function resolveTarget(sessionId: string, to_session?: string): Promise<string | null> {
+async function resolveTarget(myPid: string, to_session?: string): Promise<string | null> {
   if (to_session) return to_session;
-  const peers = await getPeers(sessionId);
+  const peers = await getPeers(myPid);
   return peers.length === 1 ? peers[0] : null;
 }
 
-// ── message delivery ────────────────────────────────────────
+// ── message delivery via unix socket ────────────────────────
 
-async function deliver(target: string, msg: Msg) {
-  const targetInbox = join(MAILBOX_ROOT, target);
-  await mkdir(targetInbox, { recursive: true });
-  await writeFile(join(targetInbox, `${Date.now()}-${msg.from}.json`), JSON.stringify(msg));
+async function deliver(targetPid: string, msg: Msg): Promise<void> {
+  return new Promise((resolve, reject) => {
+    const socket = Bun.connect({
+      unix: socketPath(targetPid),
+      socket: {
+        open(socket) {
+          socket.write(JSON.stringify(msg) + '\n');
+          socket.end();
+        },
+        close() { resolve(); },
+        data() {},
+        error(_, err) { reject(new Error(`Peer ${targetPid} unreachable: ${err.message}`)); },
+      },
+    });
+  });
 }
 
-async function broadcastMsg(sessionId: string, msg: Msg): Promise<number> {
-  const peers = await getPeers(sessionId);
-  await Promise.all(peers.map(p => deliver(p, msg)));
-  return peers.length;
+async function broadcastMsg(myPid: string, msg: Msg): Promise<number> {
+  const peers = await getPeers(myPid);
+  let sent = 0;
+  await Promise.all(peers.map(p =>
+    deliver(p, msg).then(() => sent++).catch(() => {})
+  ));
+  return sent;
 }
 
 // ── cron helpers ────────────────────────────────────────────
@@ -116,7 +112,7 @@ const CHANNEL_TOOLS = [
       type: 'object' as const,
       properties: {
         text: { type: 'string', description: 'The message to send' },
-        to_session: { type: 'string', description: 'Target session ID (optional if one peer)' },
+        to_session: { type: 'string', description: 'Target session PID (optional if one peer)' },
       },
       required: ['text'],
     },
@@ -141,7 +137,7 @@ const CHANNEL_TOOLS = [
         text: { type: 'string', description: 'The message to send' },
         every: { type: 'string', description: 'Interval shorthand: 30s, 5m, 2h, 1d' },
         cron: { type: 'string', description: 'Cron expression (6-field with seconds)' },
-        to_session: { type: 'string', description: "Target session ID, 'all' for broadcast" },
+        to_session: { type: 'string', description: "Target session PID, 'all' for broadcast" },
       },
       required: ['text'],
     },
@@ -159,7 +155,7 @@ const CHANNEL_TOOLS = [
   },
   {
     name: 'list_peers',
-    description: 'List other active ccchat sessions',
+    description: 'List other active channel sessions',
     inputSchema: { type: 'object' as const, properties: {} },
   },
   {
@@ -169,21 +165,19 @@ const CHANNEL_TOOLS = [
   },
 ];
 
-// ── shared tool executor ────────────────────────────────────
+// ── tool executor ───────────────────────────────────────────
 
-async function handleTool(toolName: string, args: Record<string, string>): Promise<string> {
-  const sessionId = await getSessionId();
-
+async function handleTool(myPid: string, toolName: string, args: Record<string, string>): Promise<string> {
   switch (toolName) {
     case 'list_peers': {
-      const peers = await getPeers(sessionId);
+      const peers = await getPeers(myPid);
       return peers.length ? peers.join('\n') : 'No peers found.';
     }
     case 'list_jobs': {
       const active = jobs.filter(j => j.job.isRunning());
       if (!active.length) return 'No active jobs.';
       return active.map(j => {
-        const next = j.job.nextRun()?.toLocaleTimeString() ?? '\u2014';
+        const next = j.job.nextRun()?.toLocaleTimeString() ?? '-';
         return `[${j.id}] ${j.cron} -> ${j.to}: "${j.text.slice(0, 40)}" next: ${next}`;
       }).join('\n');
     }
@@ -202,30 +196,31 @@ async function handleTool(toolName: string, args: Record<string, string>): Promi
       return `Cancelled ${id}.`;
     }
     case 'broadcast': {
-      const count = await broadcastMsg(sessionId, { from: sessionId, text: args.text, ts: Date.now() });
+      const msg: Msg = { from: myPid, text: args.text, ts: Date.now() };
+      const count = await broadcastMsg(myPid, msg);
       return count ? `Broadcast to ${count} peer(s).` : 'No peers found.';
     }
     case 'send': {
-      const target = await resolveTarget(sessionId, args.to_session);
+      const target = await resolveTarget(myPid, args.to_session);
       if (!target) {
-        const peers = await getPeers(sessionId);
+        const peers = await getPeers(myPid);
         return peers.length ? `Multiple peers. Specify to_session: ${peers.join(', ')}` : 'No peers found.';
       }
-      await deliver(target, { from: sessionId, text: args.text, ts: Date.now() });
+      await deliver(target, { from: myPid, text: args.text, ts: Date.now() });
       return `Sent to ${target}.`;
     }
     case 'schedule': {
-      const target = await resolveTarget(sessionId, args.to_session);
+      const target = await resolveTarget(myPid, args.to_session);
       if (!target) {
-        const peers = await getPeers(sessionId);
+        const peers = await getPeers(myPid);
         return peers.length ? `Multiple peers. Specify to_session: ${peers.join(', ')}` : 'No peers found.';
       }
       const cronExpr = args.cron ?? (args.every ? delayToCron(args.every) : null);
       if (!cronExpr) return "Provide 'every' (30s, 5m, 2h, 1d) or 'cron' expression.";
-      const id = randomUUID().slice(0, 8);
+      const id = crypto.randomUUID().slice(0, 8);
       const job = new Cron(cronExpr, async () => {
-        const msg = { from: sessionId, text: args.text, ts: Date.now() };
-        if (target === 'all') await broadcastMsg(sessionId, msg);
+        const msg: Msg = { from: myPid, text: args.text, ts: Date.now() };
+        if (target === 'all') await broadcastMsg(myPid, msg);
         else await deliver(target, msg);
       });
       jobs.push({ id, to: target, text: args.text, cron: cronExpr, job });
@@ -237,57 +232,18 @@ async function handleTool(toolName: string, args: Record<string, string>): Promi
   }
 }
 
-// ── parseChannels (for godmode add) ─────────────────────────
+// ── MCP server ──────────────────────────────────────────────
 
-export async function parseChannels(_name: string, config: ApiConfig): Promise<Manifest> {
-  const routes: Route[] = CHANNEL_TOOLS.map(tool => ({
-    path: tool.name,
-    method: 'post',
-    summary: tool.description,
-    version: '',
-    segments: [{ value: tool.name, isParam: false }],
-  }));
+async function main() {
+  const myPid = await findPid();
+  const sockPath = socketPath(myPid);
 
-  const resourceDescriptions: Record<string, string> = {};
-  for (const tool of CHANNEL_TOOLS) {
-    resourceDescriptions[tool.name] = tool.description;
-  }
+  // Clean up stale socket if it exists
+  await unlink(sockPath).catch(() => {});
 
-  return {
-    name: _name,
-    description: config.description || 'Claude Code inter-session channels',
-    specVersion: '',
-    config: { ...config, _mcpTools: CHANNEL_TOOLS } as any,
-    versions: [],
-    resourceDescriptions,
-    routes,
-  };
-}
-
-// ── executeChannelTool (for CLI mode) ───────────────────────
-
-export async function executeChannelTool(
-  toolName: string,
-  args: Record<string, string>,
-  options: { verbose?: boolean; dryRun?: boolean },
-): Promise<string> {
-  if (options.dryRun || options.verbose) {
-    process.stderr.write(`CALL channels \u2192 ${toolName}\n`);
-    if (Object.keys(args).length) process.stderr.write(`  Args: ${JSON.stringify(args)}\n`);
-    if (options.dryRun) return '';
-  }
-  return handleTool(toolName, args);
-}
-
-// ── serveChannelsMcp (for godmode mcp claude-code-channels) ─
-
-export async function serveChannelsMcp() {
-  const sessionId = await getSessionId();
-  const myInbox = join(MAILBOX_ROOT, sessionId);
-  await mkdir(myInbox, { recursive: true });
-
-  const server = new Server(
-    { name: 'ccchat', version: '0.0.1' },
+  // MCP server over stdio
+  const mcpServer = new Server(
+    { name: 'claude-code-channels', version: '0.0.1' },
     {
       capabilities: {
         experimental: { 'claude/channel': {} },
@@ -295,37 +251,48 @@ export async function serveChannelsMcp() {
       },
       instructions: [
         `You are in a two-way chat with another Claude Code instance.`,
-        `Your session: "${sessionId}".`,
-        `Inbound messages arrive as <channel source="ccchat" from_session="...">.`,
+        `Your session PID: "${myPid}".`,
+        `Inbound messages arrive as <channel source="claude-code-channels" from_session="...">.`,
         `Tools: "send", "broadcast", "schedule", "cancel", "list_peers", "list_jobs".`,
         `If there's only one peer, "send" targets it automatically.`,
       ].join('\n'),
     },
   );
 
-  server.setRequestHandler(ListToolsRequestSchema, async () => ({
+  mcpServer.setRequestHandler(ListToolsRequestSchema, async () => ({
     tools: CHANNEL_TOOLS,
   }));
 
-  server.setRequestHandler(CallToolRequestSchema, async (req) => {
-    const result = await handleTool(req.params.name, (req.params.arguments || {}) as Record<string, string>);
+  mcpServer.setRequestHandler(CallToolRequestSchema, async (req) => {
+    const result = await handleTool(myPid, req.params.name, (req.params.arguments || {}) as Record<string, string>);
     return { content: [{ type: 'text' as const, text: result }] };
   });
 
-  await server.connect(new StdioServerTransport());
+  await mcpServer.connect(new StdioServerTransport());
 
-  // Watch inbox for incoming messages
-  watch(myInbox, async (_event, filename) => {
-    if (!filename?.endsWith('.json')) return;
-    const msgPath = join(myInbox, filename);
-    try {
-      const text = await readFile(msgPath, 'utf-8');
-      const msg = JSON.parse(text) as Msg;
-      await server.notification({
-        method: 'notifications/claude/channel',
-        params: { content: msg.text, meta: { from_session: msg.from } },
-      });
-      await unlink(msgPath).catch(() => {});
-    } catch {}
+  // Unix socket server for incoming messages from peers
+  Bun.listen({
+    unix: sockPath,
+    socket: {
+      open() {},
+      data(socket, data) {
+        for (const line of data.toString().split('\n').filter(Boolean)) {
+          try {
+            const msg = JSON.parse(line) as Msg;
+            mcpServer.notification({
+              method: 'notifications/claude/channel',
+              params: { content: msg.text, meta: { from_session: msg.from } },
+            });
+          } catch {}
+        }
+      },
+    },
   });
+
+  // Cleanup on exit
+  process.on('exit', () => { unlink(sockPath).catch(() => {}); });
+  process.on('SIGINT', () => process.exit(0));
+  process.on('SIGTERM', () => process.exit(0));
 }
+
+main();

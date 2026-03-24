@@ -23,13 +23,6 @@ importers:
       croner:
         specifier: ^9.1.0
         version: 9.1.0
-    devDependencies:
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
-      typescript:
-        specifier: ^5.5.0
-        version: 5.9.3
 
   adapters/context7:
     devDependencies:
@@ -251,9 +244,6 @@ importers:
 
   packages/cli:
     dependencies:
-      '@godmode-cli/claude-code-channels':
-        specifier: workspace:*
-        version: link:../../adapters/claude-code-channels
       '@hey-api/openapi-ts':
         specifier: ^0.94.0
         version: 0.94.2(typescript@5.9.3)

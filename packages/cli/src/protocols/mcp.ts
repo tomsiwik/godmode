@@ -55,7 +55,7 @@ async function mcpRequest(
   const contentType = res.headers.get('content-type') || '';
 
   if (contentType.includes('text/event-stream')) {
-    // Parse SSE stream — extract the JSON-RPC response
+    // Parse SSE stream - extract the JSON-RPC response
     const text = await res.text();
     const lines = text.split('\n');
     for (const line of lines) {

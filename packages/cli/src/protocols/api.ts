@@ -10,7 +10,7 @@ export async function parseOpenApi(name: string, config: ApiConfig): Promise<Man
   const isJson = text.trimStart().startsWith('{');
   const spec = isJson ? JSON.parse(text) : parseYaml(text);
 
-  if (!spec.paths) throw new Error('No paths found — is this a valid OpenAPI document?');
+  if (!spec.paths) throw new Error('No paths found - is this a valid OpenAPI document?');
 
   if (!config.url) {
     if (spec.servers?.[0]?.url) {
@@ -68,7 +68,7 @@ export async function parseOpenApi(name: string, config: ApiConfig): Promise<Man
 }
 
 export function validateApiFlags(method: string, _segments: string[]): string | null {
-  // REST supports all methods — no restrictions
+  // REST supports all methods - no restrictions
   return null;
 }
 

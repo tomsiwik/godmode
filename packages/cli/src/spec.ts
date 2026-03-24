@@ -19,7 +19,7 @@ export interface ApiConfig {
   slug?: string;
   name?: string;
   description?: string;
-  type: 'api' | 'graphql' | 'mcp' | 'channels';
+  type: 'api' | 'graphql' | 'mcp';
   spec?: string;
   url?: string;
   prefix?: string;
@@ -60,15 +60,8 @@ const parsers: Record<string, (name: string, config: ApiConfig) => Promise<Manif
   mcp: parseMcp,
 };
 
-// Lazy-register channels parser to avoid loading the package at startup
-async function loadChannelsParser() {
-  const { parseChannels } = await import('@godmode-cli/claude-code-channels');
-  parsers.channels = parseChannels;
-}
-
 export async function parseSpec(name: string, config: ApiConfig): Promise<Manifest> {
-  if (config.type === 'channels' && !parsers.channels) await loadChannelsParser();
   const parser = parsers[config.type];
-  if (!parser) throw new Error(`Unknown type "${config.type}" — supported: ${Object.keys(parsers).join(', ')}`);
+  if (!parser) throw new Error(`Unknown type "${config.type}" - supported: ${Object.keys(parsers).join(', ')}`);
   return parser(name, config);
 }

@@ -5,7 +5,7 @@
 <h2 align="center">Godmode</h2>
 
 <p align="center">
-  better than mcp
+  any API as CLI. any API as MCP. no-clip limitless powers.
 </p>
 
 <p align="center">
@@ -18,127 +18,171 @@
 
 ## Introduction
 
-Turn any OpenAPI spec into a CLI. 5 lines of YAML, zero code generation.
+Turn any API into a CLI **and** an MCP server. 5 lines of YAML, zero code generation.
+
+Register once, use from the terminal **or** from Claude Code (or any MCP client).
 
 ```
-godmode stripe --help
-
-Stripe v2026-02-25.clover
-godmode enabled (API->CLI) command-line tool to interact with Stripe.
-
-Usage:
-  godmode stripe <resource> [id] [flags]
-
-Auth: bearer via STRIPE_API_KEY
-
-Resources:
-  account                     (get)
-  accounts                    (list, create, get, update, delete)
-  customers                   (list, create, get, update, delete)
-  charges                     (list, create, get, update)
-  ...                         72 more — run "godmode stripe <resource> --help"
+            OpenAPI / GraphQL / MCP spec
+                       |
+                    godmode
+                   /       \
+                 CLI       MCP
+            (terminal)  (Claude Code)
 ```
 
-## Table of Contents
+```sh
+# CLI
+godmode stripe customers cus_123
 
-- [Getting Started](#getting-started)
-- [Adapters](#adapters)
-- [Usage](#usage)
-- [Development](#development)
-- [Contributing](#contributing)
-- [License](#license)
+# MCP — serve Stripe as tools for Claude Code
+godmode mcp stripe
+```
 
-## Getting Started
+## Quick Start
 
 ```sh
 npm install -g godmode
 ```
 
-Create a config or use the interactive wizard:
-
-```sh
-godmode create
-```
-
-Or write one manually:
-
-```yaml
-# stripe.yaml
-name: Stripe
-description: godmode enabled (API->CLI) command-line tool to interact with Stripe.
-type: api
-spec: https://raw.githubusercontent.com/stripe/openapi/.../openapi.spec3.yaml
-url: https://api.stripe.com
-auth:
-  env: STRIPE_API_KEY
-```
+Add a built-in adapter:
 
 ```sh
 godmode add stripe
 godmode stripe --help
 ```
 
-## Adapters
-
-Built-in configs in `apis/`:
-
-| API | Routes | Auth |
-|-----|--------|------|
-| Stripe | 616 | Bearer |
-| GitHub | 1,093 | Bearer |
-| OpenAI | 148 | Bearer |
-| Slack | 174 | Bearer |
-| Petstore | 19 | None |
-
-## Usage
+Or point at any folder with a `manifest.yaml`:
 
 ```sh
-godmode stripe customers                          # List
-godmode stripe customers cus_123                  # Get
-godmode stripe customers --post -q email=a@b.com  # Create
-godmode stripe customers cus_123 -d               # Delete
-godmode stripe /v1/customers                      # Raw path
+godmode add ./my-adapter
+```
+
+Or use the interactive wizard:
+
+```sh
+godmode create
+```
+
+### Manifest format
+
+```yaml
+# manifest.yaml
+slug: my-adapter
+name: My Adapter
+type: api
+spec: https://example.com/openapi.json
+url: https://api.example.com
+auth:
+  env: MY_API_KEY
+```
+
+## As CLI
+
+```sh
+godmode stripe customers                     # List
+godmode stripe customers cus_123             # Get
+godmode stripe customers --post email=a@b.com  # Create
+godmode stripe customers cus_123 -d          # Delete
+godmode stripe /v1/customers                 # Raw path
 ```
 
 Navigate with `--help` at any level:
 
 ```sh
-godmode stripe --help                             # Resources, auth, usage
-godmode stripe customers --help                   # Operations & sub-resources
-godmode stripe customers balance_transactions --help
+godmode stripe --help                        # Resources, auth, usage
+godmode stripe customers --help              # Operations & sub-resources
 ```
 
-Auth via `.env`:
+## As MCP Server
+
+Serve any registered API as an MCP server over stdio:
 
 ```sh
-echo "STRIPE_API_KEY=sk_test_..." > .env
-godmode stripe account
+godmode mcp stripe
+godmode mcp github
+godmode mcp openai
 ```
 
-Full reference:
+Connect from Claude Code via `.mcp.json`:
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["mcp", "stripe"]
+    }
+  }
+}
+```
+
+Every route becomes an MCP tool. Claude Code can now call your APIs directly.
+
+## Claude Code Channels
+
+Built-in inter-session messaging for Claude Code instances:
+
+```sh
+godmode add claude-code-channels
+godmode claude-code-channels list_peers
+godmode claude-code-channels send text="hello" to_session="abc123"
+```
+
+As an MCP channel server for Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "channels": {
+      "command": "godmode",
+      "args": ["mcp", "claude-code-channels"]
+    }
+  }
+}
+```
+
+Claude Code instances can now send messages, broadcast, and schedule recurring messages to each other.
+
+## Adapters
+
+Built-in adapters in `adapters/`:
+
+| Adapter | Type | Routes | Auth |
+|---------|------|--------|------|
+| Stripe | API | 616 | Bearer |
+| GitHub | API | 1,093 | Bearer |
+| OpenAI | API | 148 | Bearer |
+| Slack | API | 174 | Bearer |
+| Petstore | API | 19 | None |
+| Context7 | MCP | 2 | API Key |
+| Claude Code Channels | Channels | 6 | None |
+
+### Supported Types
+
+| Type | Source | CLI | MCP |
+|------|--------|-----|-----|
+| `api` | OpenAPI spec | `godmode <name> <resource>` | `godmode mcp <name>` |
+| `graphql` | Introspection / SDL | `godmode <name> <query>` | `godmode mcp <name>` |
+| `mcp` | MCP endpoint | `godmode <name> <tool>` | `godmode mcp <name>` |
+| `channels` | Local filesystem | `godmode <name> <tool>` | `godmode mcp <name>` |
+
+## Project Structure
 
 ```
-Usage:
-  godmode <api> <resource> [id] [flags]
-  godmode <api> /path [flags]
-
-Setup:
-  create                      Create own custom API entrypoint
-  add <name|file>             Add API as CLI command from <name>.yaml config
-  update <name>               Re-fetch OpenAPI spec and rebuild routes
-  remove <name>               Unregister an API
-  list                        Show all registered APIs
-
-Flags:
-      --post                  POST
-      --put                   PUT
-      --patch                 PATCH
-  -d, --delete                DELETE
-  -q  <key=value>             Query (GET) or body (POST/PUT/PATCH)
-  -H  <key:value>             Add header
-      --token <tok>            Auth token (overrides config)
-      --dry-run                Preview request without sending
-  -v, --verbose                Show full request/response
+godmode/
+  packages/
+    cli/                @godmode-cli/cli       # Core CLI
+    ui/                 @godmode-cli/ui        # UI components
+  adapters/
+    stripe/             @godmode-cli/stripe    # Adapter packages
+    github/             @godmode-cli/github
+    openai/             @godmode-cli/openai
+    claude-code-channels/  @godmode-cli/claude-code-channels
+    ...
+  apps/
+    web/                                       # Web dashboard
+    docs/                                      # Documentation
 ```
 
 ## Development
@@ -149,24 +193,55 @@ pnpm build
 pnpm test
 ```
 
-Adding a new adapter:
+### Adding a new adapter
 
 ```sh
-mkdir apis/myapi
+mkdir adapters/myapi
 ```
 
 ```yaml
-# apis/myapi/myapi.yaml
-name: MyAPI
+# adapters/myapi/manifest.yaml
+slug: myapi
+name: My API
 type: api
 spec: https://example.com/openapi.json
 url: https://api.example.com
 ```
 
-```ts
-// apis/myapi/myapi.test.ts
-import { describeAdapter } from '../../test/adapter';
-describeAdapter('myapi', 'apis/myapi/myapi.yaml');
+```sh
+godmode add adapters/myapi
+godmode myapi --help
+godmode mcp myapi  # also works as MCP
+```
+
+## Reference
+
+```
+Usage:
+  godmode <api> <resource> [id] [flags]
+  godmode <api> /path [flags]
+
+Setup:
+  create                      Interactive config wizard
+  add <name|file>             Register API from manifest
+  update <name>               Re-fetch spec and rebuild
+  remove <name>               Unregister an API
+  list                        Show all registered APIs
+  mcp <name>                  Serve as MCP server (stdio)
+
+Data (httpie-style):
+  key=value                   Body field (JSON, implies POST)
+  key==value                  Query param (URL)
+
+Flags:
+  -po, --post                 POST
+  -pu, --put                  PUT
+  -pa, --patch                PATCH
+  -d,  --delete               DELETE
+  -H   <key:value>            Add header
+       --token <tok>           Auth token (overrides config)
+       --dry-run               Preview without sending
+  -v,  --verbose               Full request/response
 ```
 
 ## Contributing

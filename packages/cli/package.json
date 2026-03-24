@@ -26,7 +26,6 @@
     "release": "pnpm build && changeset publish"
   },
   "dependencies": {
-    "@godmode-cli/claude-code-channels": "workspace:*",
     "@hey-api/openapi-ts": "^0.94.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "fuzzysort": "^3.1.0",

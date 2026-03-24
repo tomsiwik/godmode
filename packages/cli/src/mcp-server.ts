@@ -1,9 +1,15 @@
 import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
+import fuzzysort from 'fuzzysort';
 import type { Manifest, Route } from './spec.js';
 import { executeToString } from './request.js';
 import { executeMcpTool } from './protocols/mcp.js';
+
+export interface McpServerOptions {
+  filter?: string;
+  method?: string;
+}
 
 // ── tool naming ─────────────────────────────────────────────
 
@@ -12,6 +18,11 @@ function routeToToolName(route: Route, type: string): string {
   // REST: method_segment1_segment2 (params excluded)
   const segments = route.segments.filter(s => !s.isParam).map(s => s.value);
   return `${route.method}_${segments.join('_')}`;
+}
+
+// Resource name for filtering (first static segment)
+function routeResource(route: Route): string {
+  return route.segments.find(s => !s.isParam)?.value || route.path;
 }
 
 // ── input schema generation ─────────────────────────────────
@@ -46,17 +57,46 @@ function routeToInputSchema(route: Route, manifest: Manifest) {
 
 // ── serve ───────────────────────────────────────────────────
 
-export async function serveMcp(manifest: Manifest) {
+export async function serveMcp(manifest: Manifest, options: McpServerOptions = {}) {
   const type = manifest.config.type;
+
+  // Filter routes
+  let routes = manifest.routes;
+
+  if (options.method) {
+    const m = fuzzysort.go(options.method, ['get', 'post', 'put', 'patch', 'delete'])[0]?.target;
+    if (m) routes = routes.filter(r => r.method === m);
+  }
+
+  if (options.filter) {
+    const resources = [...new Set(routes.map(r => routeResource(r)))];
+    const matched = new Set(fuzzysort.go(options.filter, resources).map(r => r.target));
+    routes = routes.filter(r => matched.has(routeResource(r)));
+  }
+
+  const totalRoutes = manifest.routes.length;
+  const exposedRoutes = routes.length;
+  const filtered = totalRoutes !== exposedRoutes;
+
+  // Build instructions hint
+  const hints = [];
+  if (filtered) {
+    hints.push(`Exposing ${exposedRoutes} of ${totalRoutes} routes.`);
+  } else if (totalRoutes > 50) {
+    hints.push(`${totalRoutes} routes exposed. Use --filter or --method with "godmode mcp ${manifest.name}" to narrow down.`);
+  }
 
   const server = new Server(
     { name: manifest.name, version: manifest.specVersion || '0.0.1' },
-    { capabilities: { tools: {} } },
+    {
+      capabilities: { tools: {} },
+      ...(hints.length ? { instructions: hints.join(' ') } : {}),
+    },
   );
 
   // Build tool definitions from routes
   const toolMap = new Map<string, { name: string; description: string; inputSchema: any; route: Route }>();
-  for (const route of manifest.routes) {
+  for (const route of routes) {
     const name = routeToToolName(route, type);
     if (!toolMap.has(name)) {
       toolMap.set(name, {
@@ -66,6 +106,10 @@ export async function serveMcp(manifest: Manifest) {
         route,
       });
     }
+  }
+
+  if (filtered) {
+    process.stderr.write(`MCP server: ${manifest.name} - ${toolMap.size} tools (filtered from ${totalRoutes})\n`);
   }
 
   server.setRequestHandler(ListToolsRequestSchema, async () => ({

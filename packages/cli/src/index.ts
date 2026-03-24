@@ -185,7 +185,7 @@ function navigateTrie(root: TrieNode, segments: string[]): NavResult | null {
     if (paramChild) {
       const nested = paramChild.children.find((c) => !c.isParam && c.name === seg);
       if (nested) {
-        // Skipped param — folded through without a value
+        // Skipped param - folded through without a value
         fullPath.push(`<${paramChild.name}>`, seg);
         params.push({ name: paramChild.name, provided: false });
         node = nested;
@@ -258,7 +258,7 @@ function formatColumns(items: string[], maxWidth = 76): string {
 
 import fuzzysort from 'fuzzysort';
 
-// Method labels — bold + Swagger UI colors
+// Method labels - bold + Swagger UI colors
 const METHOD_LABEL: Record<string, string> = {
   get:    '\x1b[1;38;5;34mGET\x1b[0m',       // green
   post:   '\x1b[1;38;5;25mPOST\x1b[0m',      // blue
@@ -478,32 +478,34 @@ async function main() {
 
   if (cmd === 'add') {
     if (!args[1] || args[1] === '--help' || args[1] === '-h') {
-      console.log(`Add an API as a CLI command from a config file.
+      console.log(`Add an adapter from a folder, built-in name, or manifest.
 
 Usage:
-  godmode add <name>          Looks for <name>.yaml in current directory
-  godmode add <path>          Load config from a specific file
+  godmode add <name>          Built-in adapter (e.g. stripe, github)
+  godmode add <folder>        Folder containing manifest.yaml
 
-Config format (<name>.yaml):
+Manifest format (manifest.yaml):
+  slug:    stripe             CLI name (used as "godmode <slug>")
   name:    Stripe             Display name
   description: Payments API   Short description
-  type:    api                Type (api, future: grpc, docker, cli)
-  spec:    <url>              OpenAPI spec URL or local file
-  url:     <base-url>         API base URL
+  type:    api                api | graphql | mcp
+  spec:    <url>              OpenAPI spec URL or local file (api, graphql)
+  url:     <base-url>         API base URL (api, graphql) or MCP endpoint (mcp)
   auth:
     env:   STRIPE_API_KEY     Environment variable for auth token
     type:  bearer             Auth type (bearer, api-key, basic)
   headers:
     X-Custom: value           Default headers for every request
 
-Example:
-  $ echo 'name: Stripe
-  type: api
-  spec: https://raw.githubusercontent.com/.../openapi.yaml
-  url: https://api.stripe.com
-  auth:
-    env: STRIPE_API_KEY' > stripe.yaml
-  $ godmode add stripe`);
+Types:
+  api                         OpenAPI spec  (requires spec + url)
+  graphql                     GraphQL       (requires spec or url)
+  mcp                         MCP endpoint  (requires url)
+
+Examples:
+  $ godmode add stripe
+  $ godmode add ./my-adapter
+  $ godmode add openai`);
       process.exit(args[1] ? 0 : 1);
     }
     await addApi(args[1]);
@@ -533,21 +535,55 @@ Example:
       console.log(`Serve a registered API as an MCP server over stdio.
 
 Usage:
-  godmode mcp <name>          Start MCP server for <name>
+  godmode mcp <name> [options]
 
-The server exposes all routes/tools as MCP tools.
-Connect from Claude Code or any MCP client.`);
+Options:
+  --filter <text>             Fuzzy-filter routes by resource name
+  --method <method>           Filter by HTTP method (get, post, etc.)
+
+For package-based adapters, spawns the adapter's MCP server.
+For spec-based adapters, serves routes as MCP tools.`);
       if (!name) process.exit(1);
       return;
     }
-    const manifest = await loadManifest(name);
-    if (manifest.config.type === 'channels') {
-      const { serveChannelsMcp } = await import('@godmode-cli/claude-code-channels');
-      await serveChannelsMcp();
-    } else {
-      const { serveMcp } = await import('./mcp-server.js');
-      await serveMcp(manifest);
+
+    // Parse mcp-specific flags
+    let filter: string | undefined;
+    let method: string | undefined;
+    for (let i = 2; i < args.length; i++) {
+      if (args[i] === '--filter' && args[i + 1]) filter = args[++i];
+      else if (args[i] === '--method' && args[i + 1]) method = args[++i];
     }
+
+    // Check for package-based adapter with .mcp.json
+    const { GODMODE_HOME } = await import('./config.js');
+    const { resolve } = await import('node:path');
+    const { readFile } = await import('node:fs/promises');
+    const pkgName = name.startsWith('@') ? name : `@godmode-cli/${name}`;
+    const pkgDir = resolve(GODMODE_HOME, 'node_modules', pkgName);
+    const mcpConfigPath = resolve(pkgDir, '.mcp.json');
+
+    try {
+      const mcpConfig = JSON.parse(await readFile(mcpConfigPath, 'utf-8'));
+      const serverKey = Object.keys(mcpConfig.mcpServers)[0];
+      const server = mcpConfig.mcpServers[serverKey];
+
+      if (server.type === 'stdio' && server.command) {
+        const { spawn } = await import('node:child_process');
+        const child = spawn(server.command, server.args || [], {
+          stdio: 'inherit',
+          cwd: pkgDir,
+          env: { ...process.env, ...server.env },
+        });
+        child.on('exit', (code) => process.exit(code ?? 0));
+        return;
+      }
+    } catch {}
+
+    // Fallback: generic MCP adapter from manifest
+    const manifest = await loadManifest(name);
+    const { serveMcp } = await import('./mcp-server.js');
+    await serveMcp(manifest, { filter, method });
     return;
   }
 
@@ -577,16 +613,6 @@ Connect from Claude Code or any MCP client.`);
     // MCP: call tool directly
     const toolName = parsed.segments[0];
     const result = await executeMcpTool(manifest.config, toolName, parsed.body, {
-      verbose: parsed.verbose,
-      dryRun: parsed.dryRun,
-    });
-    if (result) process.stdout.write(result + '\n');
-    return;
-  }
-
-  if (manifest.config.type === 'channels') {
-    const { executeChannelTool } = await import('@godmode-cli/claude-code-channels');
-    const result = await executeChannelTool(parsed.segments[0], parsed.body, {
       verbose: parsed.verbose,
       dryRun: parsed.dryRun,
     });

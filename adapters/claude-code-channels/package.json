@@ -2,20 +2,9 @@
   "name": "@godmode-cli/claude-code-channels",
   "version": "0.0.1",
   "type": "module",
-  "exports": {
-    ".": "./dist/channels.js",
-    "./manifest": "./manifest.yaml"
-  },
-  "files": ["dist", "manifest.yaml"],
-  "scripts": {
-    "build": "tsup"
-  },
+  "files": ["src", "manifest.yaml", ".mcp.json"],
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.12.1",
     "croner": "^9.1.0"
-  },
-  "devDependencies": {
-    "tsup": "^8.0.0",
-    "typescript": "^5.5.0"
   }
 }

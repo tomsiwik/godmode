@@ -1,10 +1,11 @@
 import { resolve, basename } from 'node:path';
 import { homedir } from 'node:os';
 import { mkdir, readFile, writeFile, readdir, unlink, access } from 'node:fs/promises';
+import { execSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import { parseSpec, type ApiConfig, type Manifest } from './spec.js';
 
-const GODMODE_HOME = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
+export const GODMODE_HOME = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
   ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
   : resolve(homedir(), '.godmode');
 const APIS_DIR = resolve(GODMODE_HOME, 'apis');
@@ -17,78 +18,88 @@ async function exists(path: string): Promise<boolean> {
   try { await access(path); return true; } catch { return false; }
 }
 
-async function resolveConfig(input: string): Promise<{ name: string; config: ApiConfig }> {
-  // Direct file path
-  if (input.endsWith('.yaml') || input.endsWith('.yml') || input.endsWith('.json')) {
-    const filePath = resolve(input);
-    const text = await readFile(filePath, 'utf-8');
-    const config: ApiConfig = filePath.endsWith('.json') ? JSON.parse(text) : parseYaml(text);
-    const name = config.slug || basename(filePath).replace(/\.(ya?ml|json)$/, '');
-    return { name, config };
-  }
-
-  // Look for <name>.yaml / .yml / .json in cwd
-  const name = input;
+async function loadManifestFromDir(dir: string): Promise<{ config: ApiConfig; ext: string } | null> {
   for (const ext of ['.yaml', '.yml', '.json']) {
-    const filePath = resolve(process.cwd(), `${name}${ext}`);
+    const filePath = resolve(dir, `manifest${ext}`);
     if (await exists(filePath)) {
       const text = await readFile(filePath, 'utf-8');
       const config: ApiConfig = ext === '.json' ? JSON.parse(text) : parseYaml(text);
-      return { name: config.slug || name, config };
+      return { config, ext };
     }
   }
+  return null;
+}
 
-  // Check <name>/manifest.yaml in cwd
-  for (const ext of ['.yaml', '.yml']) {
-    const filePath = resolve(process.cwd(), name, `manifest${ext}`);
-    if (await exists(filePath)) {
-      const text = await readFile(filePath, 'utf-8');
-      const config: ApiConfig = parseYaml(text);
-      return { name: config.slug || name, config };
-    }
-  }
+async function resolveConfig(input: string): Promise<{ name: string; config: ApiConfig; dir: string }> {
+  // Check input as a folder path (absolute or relative to cwd)
+  const asPath = resolve(process.cwd(), input);
+  const fromPath = await loadManifestFromDir(asPath);
+  if (fromPath) return { name: fromPath.config.slug || basename(asPath), config: fromPath.config, dir: asPath };
 
-  // Check installed @godmode-cli/<name> adapter
+  // Check installed @godmode-cli/<input> adapter
   try {
-    const pkgPath = resolve(import.meta.dirname, '..', '..', '..', 'adapters', name, 'manifest.yaml');
-    if (await exists(pkgPath)) {
-      const text = await readFile(pkgPath, 'utf-8');
-      const config: ApiConfig = parseYaml(text);
-      return { name: config.slug || name, config };
-    }
+    const pkgDir = resolve(import.meta.dirname, '..', '..', '..', 'adapters', input);
+    const fromPkg = await loadManifestFromDir(pkgDir);
+    if (fromPkg) return { name: fromPkg.config.slug || input, config: fromPkg.config, dir: pkgDir };
   } catch {}
 
-  throw new Error(`No config found: ${name}.yaml, ${name}/manifest.yaml, or @godmode-cli/${name}`);
+  throw new Error(`No config found: ${input}/manifest.yaml or @godmode-cli/${input}`);
 }
 
 export async function addApi(input: string) {
   await ensureDirs();
-  const { name, config } = await resolveConfig(input);
 
-  const type = config.type || 'api';
-  if (!['api', 'graphql', 'mcp', 'channels'].includes(type)) throw new Error(`Unsupported type "${type}" — supported: api, graphql, mcp, channels`);
-  config.type = type;
+  // Try to resolve as a folder with manifest.yaml
+  const resolved = await resolveConfig(input).catch(() => null);
 
-  if (type !== 'channels') {
-    if (type === 'api' && !config.spec) throw new Error('Config missing "spec" (OpenAPI spec URL or path)');
-    if (type === 'graphql' && !config.spec && !config.url) throw new Error('GraphQL config needs "spec" (SDL) or "url" (for introspection)');
-    if (type === 'mcp' && !config.url) throw new Error('MCP config needs "url" (MCP endpoint)');
-    if (!config.url && type === 'api') process.stderr.write('Warning: no "url" in config — will try to detect from spec\n');
+  if (resolved) {
+    const { name, config } = resolved;
+    const type = config.type;
+
+    // No type = package-based adapter, fall through to npm install
+    if (type && ['api', 'graphql', 'mcp'].includes(type)) {
+      if (type === 'api' && !config.spec) throw new Error('Config missing "spec" (OpenAPI spec URL or path)');
+      if (type === 'graphql' && !config.spec && !config.url) throw new Error('GraphQL config needs "spec" (SDL) or "url" (for introspection)');
+      if (type === 'mcp' && !config.url) throw new Error('MCP config needs "url" (MCP endpoint)');
+      if (!config.url && type === 'api') process.stderr.write('Warning: no "url" in config - will try to detect from spec\n');
+
+      const manifest = await parseSpec(name, config);
+      await writeFile(resolve(APIS_DIR, `${name}.json`), JSON.stringify(manifest, null, 2));
+      const urlNote = manifest.config.url ? ` at ${manifest.config.url}` : '';
+      process.stderr.write(`Registered "${name}" - ${manifest.routes.length} routes${urlNote}\n`);
+      return;
+    }
   }
 
-  const manifest = await parseSpec(name, config);
-  await writeFile(resolve(APIS_DIR, `${name}.json`), JSON.stringify(manifest, null, 2));
-  const urlNote = manifest.config.url ? ` at ${manifest.config.url}` : '';
-  process.stderr.write(`Registered "${name}" — ${manifest.routes.length} routes${urlNote}\n`);
+  // Package-based adapter - install via npm
+  const name = resolved?.name || input;
+  const installTarget = resolved?.dir && (await exists(resolve(resolved.dir, 'package.json')))
+    ? resolved.dir
+    : (input.startsWith('@') ? input : `@godmode-cli/${input}`);
+
+  process.stderr.write(`Installing ${name}...\n`);
+  try {
+    execSync(`npm install ${installTarget} --prefix ${GODMODE_HOME}`, { stdio: 'pipe' });
+  } catch (e: any) {
+    throw new Error(`Failed to install ${name}: ${e.stderr?.toString().trim() || e.message}`);
+  }
+
+  const pkgName = `@godmode-cli/${name}`;
+  const mcpConfigPath = resolve(GODMODE_HOME, 'node_modules', pkgName, '.mcp.json');
+  if (await exists(mcpConfigPath)) {
+    process.stderr.write(`Installed "${name}" (MCP server adapter)\n`);
+  } else {
+    process.stderr.write(`Installed "${name}"\n`);
+  }
 }
 
 export async function updateApi(name: string) {
   await ensureDirs();
-  const manifest = await loadManifest(name);
+  const manifest = await loadManifestFromDir(name);
   process.stderr.write(`Updating "${name}"...\n`);
   const updated = await parseSpec(name, manifest.config);
   await writeFile(resolve(APIS_DIR, `${name}.json`), JSON.stringify(updated, null, 2));
-  process.stderr.write(`Updated "${name}" — ${updated.routes.length} routes\n`);
+  process.stderr.write(`Updated "${name}" - ${updated.routes.length} routes\n`);
 }
 
 export async function removeApi(name: string) {
