@@ -35,7 +35,7 @@ function SidebarHoverProvider({ children }: { children: ReactNode }) {
 }
 
 const itemVariants = cva(
-  'relative flex flex-row items-center gap-2 rounded-lg p-2 text-start text-fd-muted-foreground wrap-anywhere [&_svg]:size-4 [&_svg]:shrink-0',
+  'relative flex flex-row items-center gap-2 rounded-lg p-2 text-start text-fd-muted-foreground wrap-anywhere [&_svg]:size-3.5 [&_svg]:shrink-0',
   {
     variants: {
       variant: {
@@ -214,7 +214,7 @@ export function SidebarItem({
       data-active={active}
       prefetch={prefetch}
       className={cn(
-        'relative flex flex-row items-center gap-2 ml-2 py-2 text-start',
+        'relative flex flex-row items-center gap-2 ml-2 py-2 text-start [&_svg]:size-3.5 [&_svg]:shrink-0',
         icon ? 'pl-6' : 'pl-4',
         className,
       )}

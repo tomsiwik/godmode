@@ -41,7 +41,7 @@ export function PlatformFeatures() {
 
                         <Button
                             asChild
-                            variant="outline"
+                            color="outline"
                             size="sm"
                             className="mt-auto w-fit">
                             <Link href="#">Learn more</Link>
@@ -92,7 +92,7 @@ export function PlatformFeatures() {
 
                         <Button
                             asChild
-                            variant="outline"
+                            color="outline"
                             size="sm"
                             className="mt-auto w-fit">
                             <Link href="#">Learn more</Link>
@@ -131,7 +131,7 @@ export function PlatformFeatures() {
 
                         <Button
                             asChild
-                            variant="outline"
+                            color="outline"
                             size="sm"
                             className="mt-auto w-fit">
                             <Link href="#">Learn more</Link>
@@ -151,7 +151,7 @@ export function PlatformFeatures() {
                     <VercelFull className="h-6 w-24" />
 
                     <div className="mt-6 lg:mt-12">
-                        <p className='text-xl *:leading-relaxed before:mr-1 before:content-["\201C"] after:ml-1 after:content-["\201D"] md:text-2xl'>Using Tailark has been like unlocking a secret design superpower. It's the perfect fusion of simplicity and versatility, enabling us to create UIs that are as stunning as they are user-friendly.</p>
+                        <p className='text-xl *:leading-relaxed before:mr-1 before:content-["\u201C"] after:ml-1 after:content-["\u201D"] md:text-2xl'>Using Tailark has been like unlocking a secret design superpower. It's the perfect fusion of simplicity and versatility, enabling us to create UIs that are as stunning as they are user-friendly.</p>
 
                         <div className="mt-12 flex items-center gap-3">
                             <div className="ring-foreground/10 aspect-square size-10 overflow-hidden rounded-lg border border-transparent shadow-md shadow-black/15 ring-1">

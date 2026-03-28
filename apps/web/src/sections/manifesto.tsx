@@ -44,7 +44,7 @@ export function Manifesto() {
                         <Button
                             onClick={() => setIsFull(!isFull)}
                             className="flex rounded pr-2.5"
-                            variant="ghost"
+                            color="ghost"
                             size="sm">
                             <span>Read {isFull ? 'Less' : 'More'}</span>
                             {isFull ? (

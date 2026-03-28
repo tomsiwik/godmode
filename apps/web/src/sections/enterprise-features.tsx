@@ -64,7 +64,7 @@ export function EnterpriseFeatures() {
                                 </ul>
                                 <Button
                                     asChild
-                                    variant="outline"
+                                    color="outline"
                                     size="sm"
                                     className="mt-auto w-fit">
                                     <Link href="#">Learn more</Link>

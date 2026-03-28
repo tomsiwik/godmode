@@ -40,14 +40,14 @@ export function TestimonialsSection() {
 
                                     <Button
                                         className="mt-8"
-                                        variant="outline"
+                                        color="outline"
                                         size="sm"
                                         asChild>
                                         <Link href="#">Read Case Study</Link>
                                     </Button>
                                 </div>
 
-                                <p className='mt-12 max-w-lg text-xl before:mr-1 before:font-serif before:content-["\201C"] after:ml-1 after:font-serif after:content-["\201D"]'>Using Tailark has been like unlocking a secret design superpower. It's the perfect fusion of simplicity and versatility, enabling us to create UIs that are as stunning as they are user-friendly.</p>
+                                <p className='mt-12 max-w-lg text-xl before:mr-1 before:font-serif before:content-["\u201C"] after:ml-1 after:font-serif after:content-["\u201D"]'>Using Tailark has been like unlocking a secret design superpower. It's the perfect fusion of simplicity and versatility, enabling us to create UIs that are as stunning as they are user-friendly.</p>
                             </div>
                         </FeatureCardContent>
 
@@ -90,7 +90,7 @@ export function TestimonialsSection() {
                 <div className="@4xl:col-span-9 relative">
                     <FeatureCard>
                         <FeatureCardContent className="bg-card!">
-                            <p className='text-lg before:mr-1 before:font-serif before:content-["\201C"] after:ml-1 after:font-serif after:content-["\201D"] lg:text-xl'>Tailus has transformed the way I develop web applications. Their extensive collection of UI components, blocks, and templates has significantly accelerated my workflow. The flexibility to customize every aspect allows me to create unique user experiences.</p>
+                            <p className='text-lg before:mr-1 before:font-serif before:content-["\u201C"] after:ml-1 after:font-serif after:content-["\u201D"] lg:text-xl'>Tailus has transformed the way I develop web applications. Their extensive collection of UI components, blocks, and templates has significantly accelerated my workflow. The flexibility to customize every aspect allows me to create unique user experiences.</p>
                         </FeatureCardContent>
 
                         <FeatureCardCIllustration className="@4xl:px-0 @4xl:pb-0 @4xl:pt-0 px-0 pb-0 pt-0">
@@ -123,7 +123,7 @@ export function TestimonialsSection() {
                 <div className="@4xl:col-span-9">
                     <FeatureCard className="grid-rows-[1fr_auto]">
                         <FeatureCardContent className="bg-background!">
-                            <p className='text-lg before:mr-1 before:font-serif before:content-["\201C"] after:ml-1 after:font-serif after:content-["\201D"] lg:text-xl'>Their extensive collection of UI components, blocks, and templates has significantly accelerated my workflow. The flexibility to customize every aspect allows me to create unique user experiences.</p>
+                            <p className='text-lg before:mr-1 before:font-serif before:content-["\u201C"] after:ml-1 after:font-serif after:content-["\u201D"] lg:text-xl'>Their extensive collection of UI components, blocks, and templates has significantly accelerated my workflow. The flexibility to customize every aspect allows me to create unique user experiences.</p>
                         </FeatureCardContent>
 
                         <FeatureCardCIllustration className="bg-background! @4xl:px-0 @4xl:pb-0 @4xl:pt-0 px-0 pb-0 pt-0">

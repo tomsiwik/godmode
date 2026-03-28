@@ -17,7 +17,7 @@ export function IntegrationsSection() {
                         <p className="text-muted-foreground mb-8 text-balance text-lg">Tailark provides a seamless integration experience, allowing you to connect and synchronize data from multiple sources with ease.</p>
 
                         <Button
-                            variant="outline"
+                            color="outline"
                             size="sm"
                             asChild>
                             <Link href="#">See all integrations</Link>

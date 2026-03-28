@@ -1,13 +1,20 @@
 @import "fumadocs-ui/css/shadcn.css";
 @import "fumadocs-ui/css/preset.css";
 
-@import "@godmode/ui/styles/globals.css";
+@import "@godmode-cli/ui/styles/globals.css";
 
-@source "../../node_modules/@godmode/ui";
+@source "../../node_modules/@godmode-cli/ui";
 
 :root {
   --fd-layout-width: 90rem;
   --fd-scroll-offset: 24px;
+  --color-fd-primary: #ff0056;
+  --color-fd-primary-foreground: #fff;
+}
+
+.dark {
+  --color-fd-primary: #ff0056;
+  --color-fd-primary-foreground: #fff;
 }
 
 @layer base {
@@ -29,5 +36,13 @@
     scroll-margin-top: calc(
       var(--fd-scroll-offset, 0px) + var(--spacing) * 32
     ) !important;
+  }
+
+  .line {
+    padding-left: 0;
+  }
+
+  .line::before {
+    display: none;
   }
 }

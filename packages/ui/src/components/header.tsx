@@ -193,7 +193,7 @@ export default function Header() {
                                 <ThemeToggle />
                                 <Button
                                     asChild
-                                    variant="outline"
+                                    color="outline"
                                     size="sm">
                                     <Link href="#">
                                         <span>Login</span>
@@ -417,7 +417,7 @@ function ThemeToggle() {
 
     return (
         <Button
-            variant="ghost"
+            color="ghost"
             size="icon"
             onClick={toggle}
             aria-label="Toggle theme">
