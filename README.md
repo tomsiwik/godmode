@@ -13,6 +13,10 @@
   <a href="https://github.com/tomsiwik/godmode/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT" /></a>
 </p>
 
+<p align="center">
+  <a href="https://docs.godmode.so">Documentation</a> &middot; <a href="https://godmode.so/adapters">Adapters</a>
+</p>
+
 ---
 
 ## Install
@@ -106,14 +110,3 @@ godmode my-gql listUsers                       # Run a query
 godmode mcp my-gql                             # Serve as MCP
 ```
 
-## Contributing
-
-Contributions of all sizes are welcome.
-
-<a href="https://github.com/tomsiwik/godmode/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=tomsiwik/godmode" />
-</a>
-
-## License
-
-[MIT](./LICENSE)
