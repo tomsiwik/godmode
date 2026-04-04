@@ -77,7 +77,7 @@ godmode create                # Interactive wizard
 
 ```
 packages/
-  cli/         @godmode-cli/cli       # Core CLI + generic MCP adapter
+  cli/         @godmode-cli/godmode       # Core CLI + generic MCP adapter
   ui/          @godmode-cli/ui        # UI components
 adapters/
   stripe/      @godmode-cli/stripe    # Spec-based adapters

@@ -172,7 +172,7 @@ Built-in adapters in `adapters/`:
 ```
 godmode/
   packages/
-    cli/                @godmode-cli/cli       # Core CLI
+    cli/                @godmode-cli/godmode       # Core CLI
     ui/                 @godmode-cli/ui        # UI components
   adapters/
     stripe/             @godmode-cli/stripe    # Adapter packages

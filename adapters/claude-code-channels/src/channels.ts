@@ -2,9 +2,11 @@ import { Server } from '@modelcontextprotocol/sdk/server/index.js';
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
 import { ListToolsRequestSchema, CallToolRequestSchema } from '@modelcontextprotocol/sdk/types.js';
 import { Cron } from 'croner';
-import { readdir, unlink } from 'node:fs/promises';
+import { readdir, readFile, unlink, access } from 'node:fs/promises';
 import { join } from 'node:path';
 import { homedir } from 'node:os';
+import { createServer, createConnection } from 'node:net';
+import { randomUUID } from 'node:crypto';
 
 // ── constants ───────────────────────────────────────────────
 
@@ -21,16 +23,19 @@ function pidFromSession(filename: string): string {
   return filename.replace(/\.(json|sock)$/, '');
 }
 
+async function fileExists(path: string): Promise<boolean> {
+  try { await access(path); return true; } catch { return false; }
+}
+
 async function findPid(): Promise<string> {
   const ppid = String(process.ppid);
   const directPath = join(SESSIONS_DIR, `${ppid}.json`);
-  const file = Bun.file(directPath);
-  if (await file.exists()) return ppid;
+  if (await fileExists(directPath)) return ppid;
 
   for (const f of await readdir(SESSIONS_DIR).catch(() => [] as string[])) {
     if (!f.endsWith('.json')) continue;
     try {
-      const data = await Bun.file(join(SESSIONS_DIR, f)).json();
+      const data = JSON.parse(await readFile(join(SESSIONS_DIR, f), 'utf-8'));
       if (data.pid === process.ppid) return pidFromSession(f);
     } catch {}
   }
@@ -63,18 +68,12 @@ async function resolveTarget(myPid: string, to_session?: string): Promise<string
 
 async function deliver(targetPid: string, msg: Msg): Promise<void> {
   return new Promise((resolve, reject) => {
-    const socket = Bun.connect({
-      unix: socketPath(targetPid),
-      socket: {
-        open(socket) {
-          socket.write(JSON.stringify(msg) + '\n');
-          socket.end();
-        },
-        close() { resolve(); },
-        data() {},
-        error(_, err) { reject(new Error(`Peer ${targetPid} unreachable: ${err.message}`)); },
-      },
+    const socket = createConnection(socketPath(targetPid), () => {
+      socket.write(JSON.stringify(msg) + '\n');
+      socket.end();
     });
+    socket.on('close', () => resolve());
+    socket.on('error', (err) => reject(new Error(`Peer ${targetPid} unreachable: ${err.message}`)));
   });
 }
 
@@ -217,7 +216,7 @@ async function handleTool(myPid: string, toolName: string, args: Record<string, 
       }
       const cronExpr = args.cron ?? (args.every ? delayToCron(args.every) : null);
       if (!cronExpr) return "Provide 'every' (30s, 5m, 2h, 1d) or 'cron' expression.";
-      const id = crypto.randomUUID().slice(0, 8);
+      const id = randomUUID().slice(0, 8);
       const job = new Cron(cronExpr, async () => {
         const msg: Msg = { from: myPid, text: args.text, ts: Date.now() };
         if (target === 'all') await broadcastMsg(myPid, msg);
@@ -271,23 +270,20 @@ async function main() {
   await mcpServer.connect(new StdioServerTransport());
 
   // Unix socket server for incoming messages from peers
-  Bun.listen({
-    unix: sockPath,
-    socket: {
-      open() {},
-      data(socket, data) {
-        for (const line of data.toString().split('\n').filter(Boolean)) {
-          try {
-            const msg = JSON.parse(line) as Msg;
-            mcpServer.notification({
-              method: 'notifications/claude/channel',
-              params: { content: msg.text, meta: { from_session: msg.from } },
-            });
-          } catch {}
-        }
-      },
-    },
+  const unixServer = createServer((socket) => {
+    socket.on('data', (data) => {
+      for (const line of data.toString().split('\n').filter(Boolean)) {
+        try {
+          const msg = JSON.parse(line) as Msg;
+          mcpServer.notification({
+            method: 'notifications/claude/channel',
+            params: { content: msg.text, meta: { from_session: msg.from } },
+          });
+        } catch {}
+      }
+    });
   });
+  unixServer.listen(sockPath);
 
   // Cleanup on exit
   process.on('exit', () => { unlink(sockPath).catch(() => {}); });

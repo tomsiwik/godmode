@@ -1,5 +1,5 @@
 {
-  "name": "@godmode-cli/cli",
+  "name": "@godmode-cli/godmode",
   "version": "0.0.1",
   "description": "better than mcp",
   "type": "module",
