@@ -27,47 +27,13 @@ npm install -g godmode
 
 ## Usage
 
-Register an API, use it from the terminal or serve it as MCP tools for Claude Code.
-
 ```sh
 godmode add stripe
 godmode stripe customers cus_123
 godmode mcp stripe
 ```
 
-That's it. 5 lines of YAML, 616 routes.
-
-## Adapters
-
-Godmode ships with built-in adapters. Add your own by pointing at any folder with a `manifest.yaml`.
-
-```sh
-godmode add ./my-adapter
-```
-
-```yaml
-# manifest.yaml
-slug: my-adapter
-name: My Adapter
-type: api                              # api | graphql | mcp
-spec: https://example.com/openapi.json
-url: https://api.example.com
-auth:
-  env: MY_API_KEY
-```
-
-| Adapter | Type | Routes |
-|---------|------|--------|
-| Stripe | api | 616 |
-| GitHub | api | 1,093 |
-| OpenAI | api | 148 |
-| Slack | api | 174 |
-| Context7 | mcp | 2 |
-| Claude Code Channels | mcp | 6 |
-
-## MCP
-
-Every registered API doubles as an MCP server over stdio.
+## Claude Code
 
 ```json
 {
@@ -80,33 +46,19 @@ Every registered API doubles as an MCP server over stdio.
 }
 ```
 
-## CLI
-
-```sh
-godmode stripe customers                       # List
-godmode stripe customers cus_123               # Get
-godmode stripe customers --post email=a@b.com  # Create
-godmode stripe customers cus_123 -d            # Delete
-godmode stripe --help                          # Explore
-```
-
-## GraphQL
-
-Same flow — point at a schema or introspection endpoint.
+## Custom Adapters
 
 ```yaml
-slug: my-gql
-name: My GraphQL API
-type: graphql
-spec: https://example.com/schema.graphql       # SDL file or introspection URL
-url: https://api.example.com/graphql
+# manifest.yaml
+slug: my-adapter
+name: My Adapter
+type: api                              # api | graphql | mcp
+spec: https://example.com/openapi.json
+url: https://api.example.com
 auth:
   env: MY_API_KEY
 ```
 
 ```sh
-godmode add ./my-gql
-godmode my-gql listUsers                       # Run a query
-godmode mcp my-gql                             # Serve as MCP
+godmode add ./my-adapter
 ```
-

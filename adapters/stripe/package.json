@@ -14,7 +14,7 @@
   "bugs": "https://github.com/tomsiwik/godmode/issues",
   "keywords": ["godmode", "adapter", "stripe", "api", "mcp"],
   "exports": { "./manifest": "./manifest.yaml" },
-  "files": ["manifest.yaml"],
+  "files": ["manifest.yaml", "README.md", "LICENSE"],
   "scripts": {
     "test": "vitest run"
   },
