@@ -1,0 +1,17 @@
+---
+title: Developers
+description: Build your own adapters
+icon: Code
+---
+
+## Overview
+
+Godmode adapters are simple YAML manifests that describe how to connect to an API. No code generation, no SDKs.
+
+## Adapter Types
+
+| Type | Source | Config |
+|------|--------|--------|
+| `api` | OpenAPI spec | `spec` + `url` |
+| `graphql` | SDL or introspection | `spec` or `url` |
+| `mcp` | MCP endpoint | `url` |

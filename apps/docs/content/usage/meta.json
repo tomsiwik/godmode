@@ -1,0 +1,5 @@
+{
+  "title": "Usage",
+  "root": true,
+  "pages": ["---[Terminal]CLI---", "index", "flags", "---[Zap]MCP---", "mcp"]
+}

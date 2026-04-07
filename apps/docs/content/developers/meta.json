@@ -1,0 +1,5 @@
+{
+  "title": "Developers",
+  "root": true,
+  "pages": ["---[Code]Getting Started---", "index", "---[Puzzle]Adapters---", "custom-adapters", "example-adapters"]
+}

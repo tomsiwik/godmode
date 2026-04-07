@@ -1,5 +1,0 @@
-{
-  "title": "API (REST/OpenAPI)",
-  "root": true,
-  "pages": ["index", "adapters", "usage", "flags"]
-}

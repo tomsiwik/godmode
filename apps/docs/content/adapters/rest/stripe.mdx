@@ -1,0 +1,29 @@
+---
+title: Stripe
+description: Stripe REST adapter
+---
+
+## Install
+
+```bash
+godmode add stripe
+```
+
+## Environment
+
+```bash
+export STRIPE_API_KEY=sk_...
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["mcp", "stripe"]
+    }
+  }
+}
+```

@@ -1,0 +1,4 @@
+{
+  "title": "REST",
+  "pages": ["stripe", "github", "openai", "slack", "petstore"]
+}

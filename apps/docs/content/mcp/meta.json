@@ -1,5 +1,0 @@
-{
-  "title": "MCP",
-  "root": true,
-  "pages": ["index", "tools", "adapters"]
-}

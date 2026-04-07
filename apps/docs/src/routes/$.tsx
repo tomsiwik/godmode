@@ -66,8 +66,9 @@ const clientLoader = browserCollections.docs.createClientLoader({
 
 const sidebarTabs = [
   { title: 'Getting Started', url: '/docs' },
-  { title: 'API (REST/OpenAPI)', url: '/api' },
-  { title: 'MCP', url: '/mcp' },
+  { title: 'Usage', url: '/usage' },
+  { title: 'Adapters', url: '/adapters' },
+  { title: 'Developers', url: '/developers' },
 ];
 
 function Page() {

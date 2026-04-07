@@ -1,0 +1,29 @@
+---
+title: GitHub
+description: GitHub REST adapter
+---
+
+## Install
+
+```bash
+godmode add github
+```
+
+## Environment
+
+```bash
+export GITHUB_TOKEN=ghp_...
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "godmode",
+      "args": ["mcp", "github"]
+    }
+  }
+}
+```

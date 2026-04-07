@@ -1,0 +1,34 @@
+---
+title: Claude Code Channels
+description: Inter-session messaging for Claude Code
+---
+
+## Install
+
+```bash
+godmode add claude-code-channels
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "channels": {
+      "command": "godmode",
+      "args": ["mcp", "claude-code-channels"]
+    }
+  }
+}
+```
+
+## Tools
+
+| Tool | Description |
+|------|-------------|
+| `send` | Send a message to another session |
+| `broadcast` | Send to all connected sessions |
+| `schedule` | Schedule recurring messages |
+| `cancel` | Cancel a scheduled job |
+| `list_peers` | List active sessions |
+| `list_jobs` | List scheduled jobs |

@@ -1,37 +1,34 @@
 ---
 title: Getting Started
-description: Turn any API into a CLI
+description: Turn any API into a CLI and MCP server
 icon: Rocket
 ---
 
-## Installation
+## Install
 
 ```bash
-npm install -g @godmode/cli
+npm install -g godmode
 ```
 
 ## Quick Start
 
-Create a config or use the interactive wizard:
-
-```bash
-godmode create
-```
-
-Or write a config manually:
-
-```yaml
-name: Stripe
-type: api
-spec: https://raw.githubusercontent.com/stripe/openapi/.../openapi.spec3.yaml
-url: https://api.stripe.com
-auth:
-  env: STRIPE_API_KEY
-```
-
 ```bash
 godmode add stripe
-godmode stripe --help
+godmode stripe customers cus_123
+godmode mcp stripe
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["mcp", "stripe"]
+    }
+  }
+}
 ```
 
 ## Supported Protocols
