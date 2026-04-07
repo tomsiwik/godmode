@@ -29,9 +29,9 @@ jobs:
       - name: Create release PR or publish
         uses: changesets/action@v1
         with:
-          publish: pnpm --filter @godmode-cli/godmode run release
-          version: pnpm --filter @godmode-cli/godmode run version
-          title: "chore: release @godmode-cli/godmode"
-          commit: "chore: release @godmode-cli/godmode"
+          publish: pnpm --filter godmode run release
+          version: pnpm --filter godmode run version
+          title: "chore: release godmode"
+          commit: "chore: release godmode"
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

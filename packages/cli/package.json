@@ -1,10 +1,18 @@
 {
-  "name": "@godmode-cli/godmode",
+  "name": "godmode",
   "version": "0.0.1",
-  "description": "better than mcp",
+  "description": "any API as CLI. any API as MCP. zero code generation.",
   "type": "module",
   "license": "MIT",
   "author": "Tomas Sivicki",
+  "homepage": "https://godmode.so",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomsiwik/godmode",
+    "directory": "packages/cli"
+  },
+  "bugs": "https://github.com/tomsiwik/godmode/issues",
+  "keywords": ["cli", "api", "mcp", "openapi", "graphql", "claude-code"],
   "bin": {
     "godmode": "./dist/index.js"
   },

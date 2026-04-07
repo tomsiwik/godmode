@@ -9,7 +9,7 @@
 </p>
 
 <p align="center">
-  <a href="https://www.npmjs.com/package/@godmode-cli/godmode"><img src="https://img.shields.io/npm/v/@godmode-cli/godmode?style=flat-square&color=blue" alt="npm" /></a>
+  <a href="https://www.npmjs.com/package/godmode"><img src="https://img.shields.io/npm/v/godmode?style=flat-square&color=blue" alt="npm" /></a>
   <a href="https://github.com/tomsiwik/godmode/blob/main/LICENSE"><img src="https://img.shields.io/badge/license-MIT-green?style=flat-square" alt="MIT" /></a>
 </p>
 
@@ -22,7 +22,7 @@
 ## Install
 
 ```sh
-npm install -g @godmode-cli/godmode
+npm install -g godmode
 ```
 
 ## Usage

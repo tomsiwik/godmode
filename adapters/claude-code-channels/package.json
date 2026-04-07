@@ -1,7 +1,18 @@
 {
   "name": "@godmode-cli/claude-code-channels",
   "version": "0.0.1",
+  "description": "Inter-session messaging for Claude Code instances",
   "type": "module",
+  "license": "MIT",
+  "author": "Tomas Sivicki",
+  "homepage": "https://godmode.so/adapters",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomsiwik/godmode",
+    "directory": "adapters/claude-code-channels"
+  },
+  "bugs": "https://github.com/tomsiwik/godmode/issues",
+  "keywords": ["godmode", "adapter", "claude-code", "channels", "mcp"],
   "files": ["dist", "manifest.yaml", ".mcp.json"],
   "scripts": {
     "build": "tsup src/channels.ts --format esm --clean"

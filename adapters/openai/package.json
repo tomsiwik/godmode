@@ -1,14 +1,25 @@
 {
   "name": "@godmode-cli/openai",
   "version": "0.0.1",
+  "description": "OpenAI adapter for Godmode",
   "type": "module",
+  "license": "MIT",
+  "author": "Tomas Sivicki",
+  "homepage": "https://godmode.so/adapters",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomsiwik/godmode",
+    "directory": "adapters/openai"
+  },
+  "bugs": "https://github.com/tomsiwik/godmode/issues",
+  "keywords": ["godmode", "adapter", "openai", "api", "mcp"],
   "exports": { "./manifest": "./manifest.yaml" },
   "files": ["manifest.yaml"],
   "scripts": {
     "test": "vitest run"
   },
   "devDependencies": {
-    "@godmode-cli/godmode": "workspace:*",
+    "godmode": "workspace:*",
     "vitest": "^4.1.0"
   }
 }
