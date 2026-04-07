@@ -1,5 +1,5 @@
 {
   "title": "Adapters",
   "root": true,
-  "pages": ["index", "---[Globe]REST---", "rest", "---[GitBranch]GraphQL---", "graphql", "---[Zap]MCP---", "mcp"]
+  "pages": ["index", "---REST---", "stripe", "openai", "slack", "---GraphQL---", "github", "---MCP---", "context7", "claude-code-channels"]
 }

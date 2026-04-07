@@ -1,6 +1,6 @@
 # @godmode-cli/github
 
-GitHub adapter for [Godmode](https://godmode.so).
+GitHub GraphQL adapter for [Godmode](https://godmode.so).
 
 ## Install
 

@@ -1,8 +1,7 @@
 slug: github
 name: GitHub
-description: GitHub REST API
-type: api
-spec: https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json
-url: https://api.github.com
+description: GitHub GraphQL API
+type: graphql
+url: https://api.github.com/graphql
 auth:
   env: GITHUB_TOKEN

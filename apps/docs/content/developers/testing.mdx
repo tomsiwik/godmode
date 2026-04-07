@@ -1,0 +1,23 @@
+---
+title: Testing Adapters
+description: Test your adapters with @godmode-cli/testing
+---
+
+## Install
+
+```bash
+npm install -D @godmode-cli/testing
+```
+
+## Usage
+
+```ts
+import { testAdapter } from '@godmode-cli/testing';
+testAdapter('my-api', 'path/to/manifest.yaml');
+```
+
+This will:
+
+1. Register the adapter via `godmode add`
+2. Test every route resolves to the correct URL using `--dry-run`
+3. Verify `--help` output shows usage and resources

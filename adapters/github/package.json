@@ -1,7 +1,7 @@
 {
   "name": "@godmode-cli/github",
   "version": "0.0.1",
-  "description": "GitHub adapter for Godmode",
+  "description": "GitHub GraphQL adapter for Godmode",
   "type": "module",
   "license": "MIT",
   "author": "Tomas Sivicki",
@@ -19,7 +19,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "godmode": "workspace:*",
+    "@godmode-cli/testing": "workspace:*",
     "vitest": "^4.1.0"
   }
 }

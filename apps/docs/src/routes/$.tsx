@@ -65,7 +65,6 @@ const clientLoader = browserCollections.docs.createClientLoader({
 });
 
 const sidebarTabs = [
-  { title: 'Getting Started', url: '/docs' },
   { title: 'Usage', url: '/usage' },
   { title: 'Adapters', url: '/adapters' },
   { title: 'Developers', url: '/developers' },

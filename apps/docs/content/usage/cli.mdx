@@ -1,0 +1,41 @@
+---
+title: Commands
+description: Making API calls from the terminal
+---
+
+## CRUD Operations
+
+```bash
+godmode stripe customers                          # List (GET)
+godmode stripe customers cus_123                  # Get (GET)
+godmode stripe customers email=test@test.com      # Create (POST)
+godmode stripe customers cus_123 -pa name=Updated # Update (PATCH)
+godmode stripe customers cus_123 -d               # Delete (DELETE)
+```
+
+## Parameters
+
+- `key=value` — body field (JSON), implies POST
+- `key==value` — query parameter (URL)
+
+```bash
+godmode stripe customers email=a@b.com name=Jane  # POST body
+godmode stripe customers limit==10                 # GET ?limit=10
+```
+
+## Raw Path Mode
+
+Bypass route matching with a leading `/`:
+
+```bash
+godmode stripe /v1/customers
+godmode stripe /v1/customers/cus_123 -d
+```
+
+## Explore
+
+```bash
+godmode stripe --help
+godmode stripe customers --help
+godmode stripe --help --filter pay
+```

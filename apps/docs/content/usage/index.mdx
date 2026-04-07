@@ -1,42 +1,36 @@
 ---
-title: CLI
-description: Making API calls from the terminal
-icon: Terminal
+title: Usage
+description: Install and first steps
 ---
 
-## CRUD Operations
+## Install
 
 ```bash
-godmode stripe customers                          # List (GET)
-godmode stripe customers cus_123                  # Get (GET)
-godmode stripe customers email=test@test.com      # Create (POST)
-godmode stripe customers cus_123 -pa name=Updated # Update (PATCH)
-godmode stripe customers cus_123 -d               # Delete (DELETE)
+npm install -g godmode
 ```
 
-## Parameters
-
-- `key=value` — body field (JSON), implies POST
-- `key==value` — query parameter (URL)
+## Add an adapter
 
 ```bash
-godmode stripe customers email=a@b.com name=Jane  # POST body
-godmode stripe customers limit==10                 # GET ?limit=10
+godmode add stripe
 ```
 
-## Raw Path Mode
-
-Bypass route matching with a leading `/`:
+## Use it
 
 ```bash
-godmode stripe /v1/customers
-godmode stripe /v1/customers/cus_123 -d
+godmode stripe customers cus_123
+godmode mcp stripe
 ```
 
-## Explore
+## Claude Code
 
-```bash
-godmode stripe --help
-godmode stripe customers --help
-godmode stripe --help --filter pay
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["mcp", "stripe"]
+    }
+  }
+}
 ```

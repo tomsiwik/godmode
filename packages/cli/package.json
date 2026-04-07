@@ -16,9 +16,6 @@
   "bin": {
     "godmode": "./dist/index.js"
   },
-  "exports": {
-    "./test/adapter": "./test/adapter.ts"
-  },
   "files": [
     "dist",
     "LICENSE",

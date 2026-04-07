@@ -1,53 +1,22 @@
 ---
-title: Example Adapters
-description: Learn from built-in adapters
+title: Petstore
+description: A minimal REST adapter with no auth
 ---
 
-## REST — Stripe
+## Manifest
 
 ```yaml
-slug: stripe
-name: Stripe
+slug: petstore
+name: Petstore
 type: api
-spec: https://raw.githubusercontent.com/stripe/openapi/.../spec3.yaml
-url: https://api.stripe.com
-auth:
-  env: STRIPE_API_KEY
-  type: bearer
+spec: https://petstore3.swagger.io/api/v3/openapi.json
+url: https://petstore3.swagger.io/api/v3
 ```
 
-## GraphQL
+## Usage
 
-```yaml
-slug: my-gql
-name: My GraphQL API
-type: graphql
-url: https://api.example.com/graphql
-auth:
-  env: MY_API_KEY
-```
-
-## MCP — Context7
-
-```yaml
-slug: context7
-name: Context7
-type: mcp
-url: https://mcp.context7.com/mcp
-auth:
-  env: CONTEXT7_API_KEY
-  type: api-key
-```
-
-## Smithery
-
-Any MCP server on Smithery works out of the box:
-
-```yaml
-slug: instagram
-name: Instagram
-type: mcp
-url: https://server.smithery.ai/instagram/mcp
-auth:
-  env: SMITHERY_API_KEY
+```bash
+godmode add petstore
+godmode petstore pet 1
+godmode mcp petstore
 ```
