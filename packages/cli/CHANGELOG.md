@@ -1,5 +1,11 @@
 # godmode
 
+## 0.0.3
+
+### Patch Changes
+
+- e97e933: adds @godmode-cli/test & @godmode-cli/coding-agents
+
 ## 0.0.2
 
 ### Patch Changes
