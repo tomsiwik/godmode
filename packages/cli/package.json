@@ -1,6 +1,6 @@
 {
   "name": "godmode",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "any API as CLI. any API as MCP. zero code generation.",
   "type": "module",
   "license": "MIT",
@@ -12,7 +12,14 @@
     "directory": "packages/cli"
   },
   "bugs": "https://github.com/tomsiwik/godmode/issues",
-  "keywords": ["cli", "api", "mcp", "openapi", "graphql", "claude-code"],
+  "keywords": [
+    "cli",
+    "api",
+    "mcp",
+    "openapi",
+    "graphql",
+    "claude-code"
+  ],
   "bin": {
     "godmode": "./dist/index.js"
   },
@@ -28,6 +35,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@godmode-cli/coding-agents": "workspace:*",
     "@hey-api/openapi-ts": "^0.94.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "fuzzysort": "^3.1.0",

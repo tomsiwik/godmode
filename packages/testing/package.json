@@ -18,7 +18,7 @@
   },
   "files": ["dist", "README.md", "LICENSE"],
   "scripts": {
-    "build": "tsup src/adapter.ts --format esm --dts --clean"
+    "build": "tsup src/adapter.ts --format esm --clean"
   },
   "dependencies": {
     "vitest": "^4.1.0"

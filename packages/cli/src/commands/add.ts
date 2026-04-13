@@ -7,6 +7,7 @@ export async function runAdd(args: string[]) {
 Usage:
   godmode add <name>          Built-in adapter (e.g. stripe, github)
   godmode add <folder>        Folder containing manifest.yaml
+  godmode add <manifest>      Direct path to manifest.yaml/json
 
 Manifest format (manifest.yaml):
   slug:    stripe             CLI name (used as "godmode <slug>")
@@ -29,6 +30,7 @@ Types:
 Examples:
   $ godmode add stripe
   $ godmode add ./my-adapter
+  $ godmode add ./my-adapter/manifest.yaml
   $ godmode add openai`);
     process.exit(args[0] ? 0 : 1);
   }

@@ -1,21 +1,31 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { readFileSync } from 'node:fs';
+import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { homedir } from 'node:os';
 
 interface Segment { value: string; isParam: boolean }
 interface Route { path: string; method: string; version: string; segments: Segment[] }
-interface Manifest { name: string; config: { url: string }; routes: Route[]; versions: Array<{ name: string }> }
+interface Manifest { name: string; config: { url: string; type?: string }; routes: Route[]; versions: Array<{ name: string }> }
 
 const METHOD_FLAG: Record<string, string[]> = {
   get: ['-g'], post: ['-po'], put: ['-pu'], patch: ['-pa'], delete: ['-d'], head: ['--head'],
 };
 
+const CLI_DIR = resolve(import.meta.dirname, '..', '..', 'cli');
+const CLI_ENTRY = resolve(CLI_DIR, 'dist', 'index.js');
+
+function ensureCliBuilt() {
+  if (!existsSync(CLI_ENTRY)) {
+    execSync('pnpm build', { cwd: CLI_DIR, stdio: 'pipe' });
+  }
+}
+
 export const gm = (...args: string[]) => {
+  ensureCliBuilt();
   try {
     return execSync(
-      `npx godmode ${args.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
+      `node ${JSON.stringify(CLI_ENTRY)} ${args.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
       { encoding: 'utf-8', timeout: 10000 },
     ).trim();
   } catch (e: any) {
@@ -63,7 +73,9 @@ function buildTestCases(name: string, manifest: Manifest) {
       acc.push({
         label: `${route.method.toUpperCase()} ${route.path}`,
         args: [name, ...segments, ...flags, '--dry-run'],
-        expected: `${manifest.config.url}${expectedPath}`,
+        expected: manifest.config.type === 'mcp'
+          ? `CALL ${manifest.config.url} → ${route.path}`
+          : `${manifest.config.url}${expectedPath}`,
       });
       return acc;
     }, []);

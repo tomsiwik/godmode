@@ -131,6 +131,7 @@ Setup:
   remove <name>               Unregister an API
   list                        Show all registered APIs
   mcp <name>                  Serve registered API as MCP server (stdio)
+  agent ...                   Run coding-agent workflows (start/send/attach/output/status)
   ...                         Run \x1b[2mgodmode add --help\x1b[0m for config format
 
 Navigation:

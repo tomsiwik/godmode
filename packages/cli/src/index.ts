@@ -6,6 +6,7 @@ import { validateGraphQLFlags } from './protocols/graphql.js';
 import { validateMcpFlags, executeMcpTool } from './protocols/mcp.js';
 import { parseArgs, readStdin } from './args.js';
 import { showHelp, showApiHelp } from './help.js';
+import { runAgentCommand } from '@godmode-cli/coding-agents';
 import type { Route } from './spec.js';
 
 loadEnv();
@@ -54,6 +55,12 @@ async function main() {
   if (cmd === 'mcp') {
     const { runMcp } = await import('./commands/mcp.js');
     await runMcp(args.slice(1));
+    return;
+  }
+
+  if (cmd === 'agent') {
+    const code = await runAgentCommand(args.slice(1));
+    if (code !== 0) process.exit(code);
     return;
   }
 

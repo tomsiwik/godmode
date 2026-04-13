@@ -1,3 +1,5 @@
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, resolve } from 'node:path';
 import type { ApiConfig, Manifest, Route } from '../spec.js';
 
 // ── introspection ───────────────────────────────────────────
@@ -71,10 +73,17 @@ export async function parseGraphQL(name: string, config: ApiConfig): Promise<Man
   let types: GqlType[];
 
   if (config.spec) {
-    process.stderr.write(`Fetching ${config.spec}...\n`);
-    const res = await fetch(config.spec);
-    if (!res.ok) throw new Error(`Failed to fetch spec: ${res.status}`);
-    types = parseSdl(await res.text());
+    const isRemote = /^https?:\/\//.test(config.spec);
+    if (isRemote) {
+      process.stderr.write(`Fetching ${config.spec}...\n`);
+      const res = await fetch(config.spec);
+      if (!res.ok) throw new Error(`Failed to fetch spec: ${res.status}`);
+      types = parseSdl(await res.text());
+    } else {
+      const specPath = isAbsolute(config.spec) ? config.spec : resolve(process.cwd(), config.spec);
+      process.stderr.write(`Loading ${specPath}...\n`);
+      types = parseSdl(await readFile(specPath, 'utf-8'));
+    }
   } else {
     if (!config.url) throw new Error('GraphQL config needs either "spec" or "url"');
     process.stderr.write(`Introspecting ${config.url}...\n`);

@@ -1,0 +1,20 @@
+type Query {
+  viewer: User
+  repository(owner: String!, name: String!): Repository
+}
+
+type Mutation {
+  addStar(input: String!): AddStarPayload
+}
+
+type User {
+  login: String
+}
+
+type Repository {
+  name: String
+}
+
+type AddStarPayload {
+  success: Boolean
+}

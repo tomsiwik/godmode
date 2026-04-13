@@ -1,9 +1,53 @@
 import { describe, it, expect, beforeAll } from 'vitest';
+import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { resolve } from 'node:path';
 import { gm } from './adapter';
 
+const seg = (value: string, isParam = false) => ({ value, isParam });
+
 describe('core CLI', () => {
-  beforeAll(() => {
-    if (!gm('list').includes('stripe')) throw new Error('Run stripe adapter test first');
+  beforeAll(async () => {
+    const home = await mkdtemp(resolve(tmpdir(), 'godmode-cli-test-'));
+    process.env.HOME = home;
+    delete process.env.XDG_CONFIG_HOME;
+    await mkdir(resolve(home, '.godmode', 'apis'), { recursive: true });
+    await writeFile(
+      resolve(home, '.godmode', 'apis', 'stripe.json'),
+      `${JSON.stringify({
+        name: 'stripe',
+        description: 'Stripe test fixture',
+        specVersion: 'test',
+        config: {
+          name: 'Stripe',
+          type: 'api',
+          url: 'https://api.stripe.com',
+          auth: { env: 'STRIPE_API_KEY', type: 'bearer' },
+        },
+        versions: [
+          { name: 'v1', prefix: '/v1' },
+          { name: 'v2', prefix: '/v2' },
+        ],
+        resourceDescriptions: {
+          customers: 'Customer resources',
+          charges: 'Charge resources',
+          billing: 'Billing resources',
+          account: 'Account details',
+          balance_transactions: 'Customer balance transactions',
+          meter_events: 'Meter events',
+        },
+        routes: [
+          { path: '/v1/customers', method: 'get', summary: 'List customers', version: 'v1', segments: [seg('customers')] },
+          { path: '/v1/customers', method: 'post', summary: 'Create customer', version: 'v1', segments: [seg('customers')] },
+          { path: '/v1/customers/{customer}', method: 'delete', summary: 'Delete customer', version: 'v1', segments: [seg('customers'), seg('customer', true)] },
+          { path: '/v1/customers/{customer}/balance_transactions', method: 'get', summary: 'List customer balance transactions', version: 'v1', segments: [seg('customers'), seg('customer', true), seg('balance_transactions')] },
+          { path: '/v1/charges', method: 'get', summary: 'List charges', version: 'v1', segments: [seg('charges')] },
+          { path: '/v1/account', method: 'get', summary: 'Retrieve account', version: 'v1', segments: [seg('account')] },
+          { path: '/v1/billing/meter_events', method: 'post', summary: 'Create meter event', version: 'v1', segments: [seg('billing'), seg('meter_events')] },
+          { path: '/v2/billing/meter_events', method: 'post', summary: 'Create meter event', version: 'v2', segments: [seg('billing'), seg('meter_events')] },
+        ],
+      }, null, 2)}\n`,
+    );
   });
 
   // ── httpie-style params ───────────────────────────────

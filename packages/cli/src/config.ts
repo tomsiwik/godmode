@@ -1,4 +1,4 @@
-import { resolve, basename } from 'node:path';
+import { resolve, basename, dirname, extname } from 'node:path';
 import { homedir } from 'node:os';
 import { mkdir, readFile, writeFile, readdir, unlink, access } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
@@ -30,11 +30,25 @@ async function loadManifestFromDir(dir: string): Promise<{ config: ApiConfig; ex
   return null;
 }
 
+async function loadManifestFile(filePath: string): Promise<{ config: ApiConfig; ext: string; dir: string } | null> {
+  if (!(await exists(filePath))) return null;
+  const ext = extname(filePath);
+  if (!['.yaml', '.yml', '.json'].includes(ext)) return null;
+  const text = await readFile(filePath, 'utf-8');
+  const config: ApiConfig = ext === '.json' ? JSON.parse(text) : parseYaml(text);
+  return { config, ext, dir: dirname(filePath) };
+}
+
 async function resolveConfig(input: string): Promise<{ name: string; config: ApiConfig; dir: string }> {
-  // Check input as a folder path (absolute or relative to cwd)
   const asPath = resolve(process.cwd(), input);
-  const fromPath = await loadManifestFromDir(asPath);
-  if (fromPath) return { name: fromPath.config.slug || basename(asPath), config: fromPath.config, dir: asPath };
+
+  // Check input as a direct manifest file path
+  const fromFile = await loadManifestFile(asPath);
+  if (fromFile) return { name: fromFile.config.slug || basename(fromFile.dir), config: fromFile.config, dir: fromFile.dir };
+
+  // Check input as a folder path containing manifest.yaml
+  const fromDir = await loadManifestFromDir(asPath);
+  if (fromDir) return { name: fromDir.config.slug || basename(asPath), config: fromDir.config, dir: asPath };
 
   // Check installed @godmode-cli/<input> adapter
   try {
@@ -43,7 +57,7 @@ async function resolveConfig(input: string): Promise<{ name: string; config: Api
     if (fromPkg) return { name: fromPkg.config.slug || input, config: fromPkg.config, dir: pkgDir };
   } catch {}
 
-  throw new Error(`No config found: ${input}/manifest.yaml or @godmode-cli/${input}`);
+  throw new Error(`No config found: ${input} (expected manifest file, folder containing manifest.yaml, or @godmode-cli/${input})`);
 }
 
 export async function addApi(input: string) {
