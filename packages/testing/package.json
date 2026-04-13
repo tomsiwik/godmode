@@ -1,5 +1,5 @@
 {
-  "name": "@godmode-cli/testing",
+  "name": "@godmode-cli/test",
   "version": "0.0.1",
   "description": "Test utilities for Godmode adapters",
   "type": "module",

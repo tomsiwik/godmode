@@ -36,7 +36,7 @@ importers:
 
   adapters/context7:
     devDependencies:
-      '@godmode-cli/testing':
+      '@godmode-cli/test':
         specifier: workspace:*
         version: link:../../packages/testing
       vitest:
@@ -45,7 +45,7 @@ importers:
 
   adapters/github:
     devDependencies:
-      '@godmode-cli/testing':
+      '@godmode-cli/test':
         specifier: workspace:*
         version: link:../../packages/testing
       vitest:
@@ -54,7 +54,7 @@ importers:
 
   adapters/openai:
     devDependencies:
-      '@godmode-cli/testing':
+      '@godmode-cli/test':
         specifier: workspace:*
         version: link:../../packages/testing
       vitest:
@@ -63,7 +63,7 @@ importers:
 
   adapters/petstore:
     devDependencies:
-      '@godmode-cli/testing':
+      '@godmode-cli/test':
         specifier: workspace:*
         version: link:../../packages/testing
       vitest:
@@ -72,7 +72,7 @@ importers:
 
   adapters/slack:
     devDependencies:
-      '@godmode-cli/testing':
+      '@godmode-cli/test':
         specifier: workspace:*
         version: link:../../packages/testing
       vitest:
@@ -81,7 +81,7 @@ importers:
 
   adapters/stripe:
     devDependencies:
-      '@godmode-cli/testing':
+      '@godmode-cli/test':
         specifier: workspace:*
         version: link:../../packages/testing
       vitest:

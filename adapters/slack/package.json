@@ -19,7 +19,7 @@
     "test": "vitest run"
   },
   "devDependencies": {
-    "@godmode-cli/testing": "workspace:*",
+    "@godmode-cli/test": "workspace:*",
     "vitest": "^4.1.0"
   }
 }

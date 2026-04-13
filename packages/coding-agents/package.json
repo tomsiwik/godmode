@@ -1,6 +1,7 @@
 {
   "name": "@godmode-cli/coding-agents",
   "version": "0.0.1",
+  "private": true,
   "description": "Coding harness launcher for Godmode",
   "type": "module",
   "license": "MIT",
