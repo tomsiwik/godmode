@@ -1,11 +1,11 @@
 ---
-title: Custom Adapters
-description: Build your own adapter
+title: Custom Extensions
+description: Build your own extension
 ---
 
 ## Overview
 
-Godmode adapters are plug-and-play. Create a `manifest.yaml`, register it, and your OpenAPI-compliant/GraphQL API is available as both a CLI and an MCP server. No code generation, no SDKs.
+Godmode extensions are plug-and-play. Create a `manifest.yaml`, register it, and your OpenAPI-compliant/GraphQL API is available as both a CLI and an MCP server. No code generation, no SDKs.
 
 ## Create a manifest
 
@@ -26,7 +26,7 @@ headers:
 ## Register
 
 ```bash
-godmode add ./my-adapter
+godmode extension add ./my-extension
 godmode my-api --help
 godmode mcp my-api
 ```

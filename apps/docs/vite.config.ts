@@ -32,7 +32,7 @@ export default defineConfig({
             },
             pages: [
               { path: '/usage' },
-              { path: '/adapters' },
+              { path: '/extensions' },
               { path: '/developers' },
             ],
           },

@@ -1,0 +1,29 @@
+---
+title: Slack
+description: Slack REST extension
+---
+
+## Install
+
+```bash
+godmode extension add slack
+```
+
+## Environment
+
+```bash
+export SLACK_TOKEN=xoxb-...
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "slack": {
+      "command": "godmode",
+      "args": ["mcp", "slack"]
+    }
+  }
+}
+```

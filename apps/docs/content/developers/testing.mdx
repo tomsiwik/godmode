@@ -1,6 +1,6 @@
 ---
-title: Testing Adapters
-description: Test your adapters with @godmode-cli/test
+title: Testing Extensions
+description: Test your extensions with @godmode-cli/test
 ---
 
 ## Install
@@ -12,12 +12,12 @@ npm install -D @godmode-cli/test
 ## Usage
 
 ```ts
-import { testAdapter } from '@godmode-cli/test';
-testAdapter('my-api', 'path/to/manifest.yaml');
+import { testExtension } from '@godmode-cli/test';
+testExtension('my-api', 'path/to/manifest.yaml');
 ```
 
 This will:
 
-1. Register the adapter via `godmode add`
+1. Register the extension via `godmode extension add`
 2. Test every route resolves to the correct URL using `--dry-run`
 3. Verify `--help` output shows usage and resources

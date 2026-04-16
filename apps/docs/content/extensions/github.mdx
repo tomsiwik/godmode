@@ -1,0 +1,29 @@
+---
+title: GitHub
+description: GitHub GraphQL extension
+---
+
+## Install
+
+```bash
+godmode extension add github
+```
+
+## Environment
+
+```bash
+export GITHUB_TOKEN=ghp_...
+```
+
+## Claude Code
+
+```json
+{
+  "mcpServers": {
+    "github": {
+      "command": "godmode",
+      "args": ["mcp", "github"]
+    }
+  }
+}
+```

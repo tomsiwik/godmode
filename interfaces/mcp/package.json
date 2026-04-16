@@ -1,0 +1,22 @@
+{
+  "name": "@godmode-cli/interface-mcp",
+  "version": "0.0.1",
+  "private": true,
+  "description": "MCP interface — serve extensions as MCP tools",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./server": "./src/server.ts",
+    "./command": "./src/command.ts"
+  },
+  "files": ["src"],
+  "dependencies": {
+    "@godmode-cli/interface-api": "workspace:*",
+    "@modelcontextprotocol/sdk": "^1.12.1",
+    "fuzzysort": "^3.1.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

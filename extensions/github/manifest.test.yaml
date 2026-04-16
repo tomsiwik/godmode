@@ -1,0 +1,8 @@
+name: github
+description: GitHub GraphQL API
+interfaces:
+  graphql:
+    spec: ./schema.graphql
+    url: https://api.github.com/graphql
+auth:
+  env: GITHUB_TOKEN

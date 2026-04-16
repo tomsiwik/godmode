@@ -86,5 +86,5 @@ export async function configWizard() {
   const filepath = resolve(process.cwd(), filename);
   writeFileSync(filepath, yaml);
   console.log(`\nSaved ${filepath}`);
-  console.log(`Run \x1b[1mgodmode add ${response.name.toLowerCase()}\x1b[0m to register it.`);
+  console.log(`Run \x1b[1mgodmode extension add ${response.name.toLowerCase()}\x1b[0m to register it.`);
 }

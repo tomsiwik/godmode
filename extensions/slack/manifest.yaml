@@ -1,0 +1,8 @@
+name: slack
+description: Slack Web API
+interfaces:
+  api:
+    spec: https://raw.githubusercontent.com/slackapi/slack-api-specs/refs/heads/master/web-api/slack_web_openapi_v2.json
+    url: https://slack.com/api
+auth:
+  env: SLACK_TOKEN

@@ -11,8 +11,8 @@ npm install -g godmode
 ## Usage
 
 ```sh
-godmode add stripe
-godmode stripe customers cus_123
+godmode extension add stripe
+godmode api stripe customers cus_123
 godmode mcp stripe
 ```
 

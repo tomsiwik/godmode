@@ -2,15 +2,15 @@ import { addApi } from '../config.js';
 
 export async function runAdd(args: string[]) {
   if (!args[0] || args[0] === '--help' || args[0] === '-h') {
-    console.log(`Add an adapter from a folder, built-in name, or manifest.
+    console.log(`Add an extension from a folder, built-in name, or manifest.
 
 Usage:
-  godmode add <name>          Built-in adapter (e.g. stripe, github)
-  godmode add <folder>        Folder containing manifest.yaml
-  godmode add <manifest>      Direct path to manifest.yaml/json
+  godmode extension add <name>          Built-in extension (e.g. stripe, github)
+  godmode extension add <folder>        Folder containing manifest.yaml
+  godmode extension add <manifest>      Direct path to manifest.yaml/json
 
 Manifest format (manifest.yaml):
-  slug:    stripe             CLI name (used as "godmode <slug>")
+  slug:    stripe             CLI name
   name:    Stripe             Display name
   description: Payments API   Short description
   type:    api                api | graphql | mcp
@@ -28,10 +28,10 @@ Types:
   mcp                         MCP endpoint  (requires url)
 
 Examples:
-  $ godmode add stripe
-  $ godmode add ./my-adapter
-  $ godmode add ./my-adapter/manifest.yaml
-  $ godmode add openai`);
+  $ godmode extension add stripe
+  $ godmode extension add ./my-extension
+  $ godmode extension add ./my-extension/manifest.yaml
+  $ godmode extension add openai`);
     process.exit(args[0] ? 0 : 1);
   }
   await addApi(args[0]);

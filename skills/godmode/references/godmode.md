@@ -4,7 +4,7 @@
 
 ```yaml
 # manifest.yaml
-slug: <name>                    # CLI name (godmode <slug>)
+slug: <name>                    # CLI name
 name: <display-name>            # Display name
 description: <text>             # Short description
 type: api | graphql | mcp       # Protocol type
@@ -18,7 +18,7 @@ headers:
   <key>: <value>                # Default headers
 ```
 
-Package-based adapters omit `type`, `spec`, and `url`. They provide a `.mcp.json` instead.
+Package-based extensions omit `type`, `spec`, and `url`. They provide a `.mcp.json` instead.
 
 ## .mcp.json format
 
@@ -40,28 +40,32 @@ Standard MCP server configuration, following the Claude Code convention:
 ## CLI usage
 
 ```sh
-# Setup
-godmode add <name>              # Built-in adapter by name
-godmode add <folder>            # Folder with manifest.yaml
-godmode create                  # Interactive wizard
-godmode update <name>           # Re-fetch spec
-godmode remove <name>           # Unregister
-godmode list                    # Show all registered
+# Extension management
+godmode extension add <name>              # Built-in extension by name
+godmode extension add <folder>            # Folder with manifest.yaml
+godmode extension create                  # Interactive wizard
+godmode extension update <name>           # Re-fetch spec
+godmode extension remove <name>           # Unregister
+godmode extension list                    # Show all registered
+godmode extension info <name>             # Show details + interfaces
 
-# API interaction (httpie-style)
-godmode <api> <resource>                  # GET (list)
-godmode <api> <resource> <id>             # GET (detail)
-godmode <api> <resource> --post key=val   # POST
-godmode <api> <resource> <id> -d          # DELETE
-godmode <api> <resource> key==val         # Query param
-godmode <api> /raw/path                   # Raw path mode
+# API interface (httpie-style)
+godmode api <ext> <resource>              # GET (list)
+godmode api <ext> <resource> <id>         # GET (detail)
+godmode api <ext> <resource> --post key=val  # POST
+godmode api <ext> <resource> <id> -d      # DELETE
+godmode api <ext> <resource> key==val     # Query param
+godmode api <ext> /raw/path               # Raw path mode
 
-# MCP server
-godmode mcp <name>              # Serve as MCP over stdio
+# GraphQL interface
+godmode graphql <ext> query '{ ... }'     # Query
+
+# MCP interface
+godmode mcp <ext>                         # Serve as MCP over stdio
 
 # Navigation
-godmode <api> --help            # Resources, auth
-godmode <api> <resource> --help # Operations, sub-resources
+godmode api <ext> --help                  # Resources, auth
+godmode api <ext> <resource> --help       # Operations, sub-resources
 ```
 
 ## Method flags
@@ -88,10 +92,10 @@ godmode <api> <resource> --help # Operations, sub-resources
 
 ## Config resolution order
 
-`godmode add <input>`:
+`godmode extension add <input>`:
 
 1. `<input>/manifest.yaml` in current directory
-2. `adapters/<input>/manifest.yaml` in godmode install
+2. `extensions/<input>/manifest.yaml` in godmode install
 3. `npm install @godmode-cli/<input> --prefix ~/.godmode/`
 
 ## MCP server resolution
@@ -99,14 +103,14 @@ godmode <api> <resource> --help # Operations, sub-resources
 `godmode mcp <name>`:
 
 1. Check `~/.godmode/node_modules/@godmode-cli/<name>/.mcp.json` → spawn from config
-2. Fallback: load manifest from `~/.godmode/apis/<name>.json` → generic MCP adapter
+2. Fallback: load manifest from `~/.godmode/apis/<name>.json` → generic MCP server
 
-## Built-in adapters
+## Built-in extensions
 
-| Adapter | Type | Slug |
-|---------|------|------|
+| Extension | Type | Name |
+|-----------|------|------|
 | Stripe | api | `stripe` |
-| GitHub | api | `github` |
+| GitHub | graphql | `github` |
 | OpenAI | api | `openai` |
 | Slack | api | `slack` |
 | Petstore | api | `petstore` |

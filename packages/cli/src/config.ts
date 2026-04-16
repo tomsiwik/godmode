@@ -50,9 +50,9 @@ async function resolveConfig(input: string): Promise<{ name: string; config: Api
   const fromDir = await loadManifestFromDir(asPath);
   if (fromDir) return { name: fromDir.config.slug || basename(asPath), config: fromDir.config, dir: asPath };
 
-  // Check installed @godmode-cli/<input> adapter
+  // Check installed @godmode-cli/<input> extension
   try {
-    const pkgDir = resolve(import.meta.dirname, '..', '..', '..', 'adapters', input);
+    const pkgDir = resolve(import.meta.dirname, '..', '..', '..', 'extensions', input);
     const fromPkg = await loadManifestFromDir(pkgDir);
     if (fromPkg) return { name: fromPkg.config.slug || input, config: fromPkg.config, dir: pkgDir };
   } catch {}
@@ -70,7 +70,7 @@ export async function addApi(input: string) {
     const { name, config } = resolved;
     const type = config.type;
 
-    // No type = package-based adapter, fall through to npm install
+    // No type = package-based extension, fall through to npm install
     if (type && ['api', 'graphql', 'mcp'].includes(type)) {
       if (type === 'api' && !config.spec) throw new Error('Config missing "spec" (OpenAPI spec URL or path)');
       if (type === 'graphql' && !config.spec && !config.url) throw new Error('GraphQL config needs "spec" (SDL) or "url" (for introspection)');
@@ -85,7 +85,7 @@ export async function addApi(input: string) {
     }
   }
 
-  // Package-based adapter - install via npm
+  // Package-based extension - install via npm
   const name = resolved?.name || input;
   const installTarget = resolved?.dir && (await exists(resolve(resolved.dir, 'package.json')))
     ? resolved.dir
@@ -101,7 +101,7 @@ export async function addApi(input: string) {
   const pkgName = `@godmode-cli/${name}`;
   const mcpConfigPath = resolve(GODMODE_HOME, 'node_modules', pkgName, '.mcp.json');
   if (await exists(mcpConfigPath)) {
-    process.stderr.write(`Installed "${name}" (MCP server adapter)\n`);
+    process.stderr.write(`Installed "${name}" (MCP server extension)\n`);
   } else {
     process.stderr.write(`Installed "${name}"\n`);
   }
@@ -131,7 +131,7 @@ export async function listApis() {
   const files = await readdir(APIS_DIR);
   const apis = files.filter((f) => f.endsWith('.json'));
   if (!apis.length) {
-    console.log('No APIs registered. Create a <name>.yaml config and run: godmode add <name>');
+    console.log('No extensions registered. Create a manifest.yaml and run: godmode extension add <name>');
     return;
   }
   for (const file of apis) {
@@ -148,7 +148,7 @@ export async function loadManifest(name: string): Promise<Manifest> {
   try {
     return JSON.parse(await readFile(resolve(APIS_DIR, `${name}.json`), 'utf-8'));
   } catch {
-    process.stderr.write(`API "${name}" not found. Create ${name}.yaml and run: godmode add ${name}\n`);
+    process.stderr.write(`Extension "${name}" not found. Create ${name}.yaml and run: godmode extension add ${name}\n`);
     process.exit(1);
   }
 }

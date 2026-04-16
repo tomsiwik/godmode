@@ -23,6 +23,10 @@
   "bin": {
     "godmode": "./dist/index.js"
   },
+  "exports": {
+    "./spec": "./src/spec.ts",
+    "./config": "./src/config.ts"
+  },
   "files": [
     "dist",
     "LICENSE",
@@ -35,7 +39,10 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@godmode-cli/coding-agents": "workspace:*",
+    "@godmode-cli/command-agent": "workspace:*",
+    "@godmode-cli/interface-api": "workspace:*",
+    "@godmode-cli/interface-graphql": "workspace:*",
+    "@godmode-cli/interface-mcp": "workspace:*",
     "@hey-api/openapi-ts": "^0.94.0",
     "@modelcontextprotocol/sdk": "^1.12.1",
     "fuzzysort": "^3.1.0",

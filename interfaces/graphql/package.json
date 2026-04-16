@@ -1,0 +1,15 @@
+{
+  "name": "@godmode-cli/interface-graphql",
+  "version": "0.0.1",
+  "private": true,
+  "description": "GraphQL interface — query execution for SDL",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": ["src"],
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

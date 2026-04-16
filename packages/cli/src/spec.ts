@@ -1,6 +1,6 @@
-import { parseOpenApi } from './protocols/api.js';
-import { parseGraphQL } from './protocols/graphql.js';
-import { parseMcp } from './protocols/mcp.js';
+import { parseOpenApi } from '@godmode-cli/interface-api';
+import { parseGraphQL } from '@godmode-cli/interface-graphql';
+import { parseMcp } from '@godmode-cli/interface-mcp';
 
 // ── types ───────────────────────────────────────────────────
 

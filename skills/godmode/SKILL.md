@@ -17,7 +17,7 @@ godmode turns any OpenAPI, GraphQL, or MCP spec into a CLI command and an MCP se
             (terminal)  (Claude Code)
 ```
 
-## Two kinds of adapters
+## Two kinds of extensions
 
 ### Spec-based (API, GraphQL, MCP)
 
@@ -34,18 +34,18 @@ auth:
 ```
 
 ```sh
-godmode add stripe          # register
-godmode stripe customers    # CLI
-godmode mcp stripe          # MCP server
+godmode extension add stripe          # register
+godmode api stripe customers          # CLI
+godmode mcp stripe                    # MCP server
 ```
 
-### Package-based (custom adapters)
+### Package-based (custom extensions)
 
 An npm package with a `.mcp.json` and its own MCP server implementation. Installed to `~/.godmode/node_modules/`.
 
 ```sh
-godmode add claude-code-channels   # installs package
-godmode mcp claude-code-channels   # spawns MCP server from .mcp.json
+godmode extension add claude-code-channels   # installs package
+godmode mcp claude-code-channels             # spawns MCP server from .mcp.json
 ```
 
 The `.mcp.json` declares how to run it:
@@ -65,30 +65,43 @@ The `.mcp.json` declares how to run it:
 ## Key commands
 
 ```sh
-godmode add <name|folder>     # Register adapter (spec or package)
-godmode <name> <resource>     # CLI mode
-godmode mcp <name>            # MCP server mode (stdio)
-godmode list                  # Show registered adapters
-godmode remove <name>         # Unregister
-godmode create                # Interactive wizard
+godmode extension add <name|folder>   # Register extension (spec or package)
+godmode extension remove <name>       # Unregister
+godmode extension list                # Show registered extensions
+godmode extension update <name>       # Re-fetch spec, rebuild
+godmode extension info <name>         # Show details + available interfaces
+godmode extension create              # Interactive wizard
+
+godmode api <name> <resource>         # REST interface
+godmode graphql <name> <query>        # GraphQL interface
+godmode mcp <name>                    # MCP server interface (stdio)
+godmode agent <name>                  # Agent command (requires command-agent)
+godmode skill <name>                  # Load agentic skill
 ```
 
 ## Monorepo structure
 
 ```
 packages/
-  cli/         godmode       # Core CLI + generic MCP adapter
-  ui/          @godmode-cli/ui        # UI components
-adapters/
-  stripe/      @godmode-cli/stripe    # Spec-based adapters
-  github/      @godmode-cli/github
-  claude-code-channels/               # Package-based adapter
+  cli/                  godmode                       # Core CLI dispatch
+  test/                  @godmode-cli/test             # Test utilities
+  ui/                   @godmode-cli/ui               # UI components
+interfaces/
+  api/                  @godmode-cli/interface-api     # REST execution
+  graphql/              @godmode-cli/interface-graphql # GraphQL execution
+  mcp/                  @godmode-cli/interface-mcp     # MCP server wrapping
+commands/
+  agent/                @godmode-cli/command-agent     # Coding agent orchestration
+extensions/
+  stripe/               @godmode-cli/stripe           # Spec-based extensions
+  github/               @godmode-cli/github
+  claude-code-channels/                               # Package-based extension
 apps/
-  web/                                # Web dashboard
-  docs/                               # Documentation
+  web/                                                # Web dashboard
+  docs/                                               # Documentation
 ```
 
 ## Storage
 
-- `~/.godmode/apis/` — parsed manifests for spec-based adapters
-- `~/.godmode/node_modules/` — installed package-based adapters
+- `~/.godmode/apis/` — parsed manifests for spec-based extensions
+- `~/.godmode/node_modules/` — installed package-based extensions

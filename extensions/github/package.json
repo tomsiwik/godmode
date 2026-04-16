@@ -1,0 +1,25 @@
+{
+  "name": "@godmode-cli/github",
+  "version": "0.0.1",
+  "description": "GitHub extension for Godmode",
+  "type": "module",
+  "license": "MIT",
+  "author": "Tomas Sivicki",
+  "homepage": "https://godmode.so/extensions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomsiwik/godmode",
+    "directory": "extensions/github"
+  },
+  "bugs": "https://github.com/tomsiwik/godmode/issues",
+  "keywords": ["godmode", "extension", "github", "api", "graphql", "mcp"],
+  "exports": { "./manifest": "./manifest.yaml" },
+  "files": ["manifest.yaml", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@godmode-cli/test": "workspace:*",
+    "vitest": "^4.1.0"
+  }
+}

@@ -1,0 +1,5 @@
+{
+  "title": "Extensions",
+  "root": true,
+  "pages": ["index", "---REST---", "stripe", "openai", "slack", "---GraphQL---", "github", "---MCP---", "context7", "claude-code-channels"]
+}

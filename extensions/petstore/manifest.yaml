@@ -1,0 +1,6 @@
+name: petstore
+description: Sample Pet Store API
+interfaces:
+  api:
+    spec: https://petstore3.swagger.io/api/v3/openapi.json
+    url: https://petstore3.swagger.io/api/v3

@@ -18,76 +18,6 @@ importers:
         specifier: ^2.7.0
         version: 2.8.19
 
-  adapters/claude-code-channels:
-    dependencies:
-      '@modelcontextprotocol/sdk':
-        specifier: ^1.12.1
-        version: 1.27.1(zod@4.3.6)
-      croner:
-        specifier: ^9.1.0
-        version: 9.1.0
-    devDependencies:
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
-      typescript:
-        specifier: ^5.5.0
-        version: 5.9.3
-
-  adapters/context7:
-    devDependencies:
-      '@godmode-cli/test':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  adapters/github:
-    devDependencies:
-      '@godmode-cli/test':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  adapters/openai:
-    devDependencies:
-      '@godmode-cli/test':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  adapters/petstore:
-    devDependencies:
-      '@godmode-cli/test':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  adapters/slack:
-    devDependencies:
-      '@godmode-cli/test':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  adapters/stripe:
-    devDependencies:
-      '@godmode-cli/test':
-        specifier: workspace:*
-        version: link:../../packages/testing
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
   apps/docs:
     dependencies:
       '@godmode-cli/ui':
@@ -258,11 +188,137 @@ importers:
         specifier: ^8.0.1
         version: 8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2)
 
+  commands/agent:
+    devDependencies:
+      '@types/node':
+        specifier: ^22.0.0
+        version: 22.19.15
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@22.19.15)(msw@2.12.13(@types/node@22.19.15)(typescript@5.9.3))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  extensions/claude-code-channels:
+    dependencies:
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.27.1(zod@4.3.6)
+      croner:
+        specifier: ^9.1.0
+        version: 9.1.0
+    devDependencies:
+      tsup:
+        specifier: ^8.0.0
+        version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  extensions/context7:
+    devDependencies:
+      '@godmode-cli/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  extensions/github:
+    devDependencies:
+      '@godmode-cli/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  extensions/openai:
+    devDependencies:
+      '@godmode-cli/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  extensions/petstore:
+    devDependencies:
+      '@godmode-cli/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  extensions/slack:
+    devDependencies:
+      '@godmode-cli/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  extensions/stripe:
+    devDependencies:
+      '@godmode-cli/test':
+        specifier: workspace:*
+        version: link:../../packages/test
+      vitest:
+        specifier: ^4.1.0
+        version: 4.1.0(@types/node@25.5.0)(msw@2.12.13(@types/node@25.5.0)(typescript@5.9.3))(vite@8.0.1(@types/node@25.5.0)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
+
+  interfaces/api:
+    dependencies:
+      yaml:
+        specifier: ^2.8.0
+        version: 2.8.2
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  interfaces/graphql:
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
+  interfaces/mcp:
+    dependencies:
+      '@godmode-cli/interface-api':
+        specifier: workspace:*
+        version: link:../api
+      '@modelcontextprotocol/sdk':
+        specifier: ^1.12.1
+        version: 1.27.1(zod@4.3.6)
+      fuzzysort:
+        specifier: ^3.1.0
+        version: 3.1.0
+    devDependencies:
+      typescript:
+        specifier: ^5.5.0
+        version: 5.9.3
+
   packages/cli:
     dependencies:
-      '@godmode-cli/coding-agents':
+      '@godmode-cli/command-agent':
         specifier: workspace:*
-        version: link:../coding-agents
+        version: link:../../commands/agent
+      '@godmode-cli/interface-api':
+        specifier: workspace:*
+        version: link:../../interfaces/api
+      '@godmode-cli/interface-graphql':
+        specifier: workspace:*
+        version: link:../../interfaces/graphql
+      '@godmode-cli/interface-mcp':
+        specifier: workspace:*
+        version: link:../../interfaces/mcp
       '@hey-api/openapi-ts':
         specifier: ^0.94.0
         version: 0.94.2(typescript@5.9.3)
@@ -295,22 +351,7 @@ importers:
         specifier: ^4.1.0
         version: 4.1.0(@types/node@22.19.15)(msw@2.12.13(@types/node@22.19.15)(typescript@5.9.3))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
 
-  packages/coding-agents:
-    devDependencies:
-      '@types/node':
-        specifier: ^22.0.0
-        version: 22.19.15
-      tsup:
-        specifier: ^8.0.0
-        version: 8.5.1(jiti@2.6.1)(postcss@8.5.8)(tsx@4.21.0)(typescript@5.9.3)(yaml@2.8.2)
-      typescript:
-        specifier: ^5.5.0
-        version: 5.9.3
-      vitest:
-        specifier: ^4.1.0
-        version: 4.1.0(@types/node@22.19.15)(msw@2.12.13(@types/node@22.19.15)(typescript@5.9.3))(vite@8.0.1(@types/node@22.19.15)(esbuild@0.27.4)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.2))
-
-  packages/testing:
+  packages/test:
     dependencies:
       vitest:
         specifier: ^4.1.0

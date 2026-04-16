@@ -1,0 +1,20 @@
+{
+  "name": "@godmode-cli/interface-api",
+  "version": "0.0.1",
+  "private": true,
+  "description": "REST interface — HTTP execution for OpenAPI",
+  "type": "module",
+  "license": "MIT",
+  "exports": {
+    ".": "./src/index.ts",
+    "./match": "./src/match.ts",
+    "./request": "./src/request.ts"
+  },
+  "files": ["src"],
+  "dependencies": {
+    "yaml": "^2.8.0"
+  },
+  "devDependencies": {
+    "typescript": "^5.5.0"
+  }
+}

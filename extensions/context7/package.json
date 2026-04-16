@@ -1,0 +1,25 @@
+{
+  "name": "@godmode-cli/context7",
+  "version": "0.0.1",
+  "description": "Context7 extension for Godmode",
+  "type": "module",
+  "license": "MIT",
+  "author": "Tomas Sivicki",
+  "homepage": "https://godmode.so/extensions",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomsiwik/godmode",
+    "directory": "extensions/context7"
+  },
+  "bugs": "https://github.com/tomsiwik/godmode/issues",
+  "keywords": ["godmode", "extension", "context7", "mcp"],
+  "exports": { "./manifest": "./manifest.yaml" },
+  "files": ["manifest.yaml", "README.md", "LICENSE"],
+  "scripts": {
+    "test": "vitest run"
+  },
+  "devDependencies": {
+    "@godmode-cli/test": "workspace:*",
+    "vitest": "^4.1.0"
+  }
+}

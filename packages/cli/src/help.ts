@@ -118,25 +118,32 @@ function methodLabels(node: TrieNode): string {
 
 export function showHelp() {
   console.log(`\u0262\u1d0f\u1d05\u1d0d\u1d0f\u1d05\u1d07
-\x1b[2mbetter than mcp\x1b[0m
+\x1b[2mthe swiss army knife for coding agents\x1b[0m
 
 Usage:
-  godmode <api> <resource> [id] [flags]
-  godmode <api> /path [flags]
+  godmode <interface> <extension> [args]
+  godmode extension <command> [args]
 
-Setup:
-  create                      Create own custom API entrypoint
-  add <name|file>             Add API as CLI command from <name>.yaml config
-  update <name>               Re-fetch OpenAPI spec and rebuild routes
-  remove <name>               Unregister an API
-  list                        Show all registered APIs
-  mcp <name>                  Serve registered API as MCP server (stdio)
-  agent ...                   Run coding-agent workflows (start/send/attach/output/status)
-  ...                         Run \x1b[2mgodmode add --help\x1b[0m for config format
+Interfaces:
+  api <ext> <resource> [id]   REST API call
+  graphql <ext> <query>       GraphQL query
+  mcp <ext>                   Serve extension as MCP server (stdio)
+  skill <ext>                 Load agentic skill
+
+Commands:
+  agent ...                   Coding-agent workflows (start/send/attach/output/status)
+
+Extension management:
+  extension add <name|file>   Install an extension
+  extension remove <name>     Uninstall an extension
+  extension update <name>     Re-fetch spec, rebuild routes
+  extension list              Show installed extensions
+  extension info <name>       Show extension details and interfaces
+  extension create            Interactive manifest wizard
 
 Navigation:
-  <api> --help                Show resources, auth, and usage
-  <api> <resource> --help     Show operations and sub-resources
+  api <ext> --help            Show resources, auth, and usage
+  api <ext> <resource> --help Show operations and sub-resources
 
 Methods:
   -g,  --get                  GET (default)
@@ -155,7 +162,7 @@ Options:
       --dry-run                Preview request without sending
   -v, --verbose                Show full request/response
 
-Use "godmode <api> --help" for API-specific usage.`);
+Use "godmode api <ext> --help" for extension-specific usage.`);
 }
 
 // ── showApiHelp ─────────────────────────────────────────────
@@ -178,7 +185,7 @@ export function showApiHelp(manifest: Manifest, apiName: string, path: string[],
     const ver = manifest.specVersion ? ` \x1b[2mv${manifest.specVersion}\x1b[0m` : '';
     const desc = manifest.description ? `\n\x1b[2m${manifest.description}\x1b[0m` : '';
     console.log(`${name}${ver}${desc}\n`);
-    console.log(`Usage:\n  godmode ${apiName} <resource> [id] [flags]\n`);
+    console.log(`Usage:\n  godmode api ${apiName} <resource> [id] [flags]\n`);
 
     const auth = manifest.config.auth;
     if (auth?.env) {
@@ -189,7 +196,7 @@ export function showApiHelp(manifest: Manifest, apiName: string, path: string[],
   } else {
     const paramHint = getParamName(node);
     const idRef = paramHint ? ` [${paramHint}]` : '';
-    console.log(`Usage:\n  godmode ${apiName} ${resourceName}${idRef} [flags]\n`);
+    console.log(`Usage:\n  godmode api ${apiName} ${resourceName}${idRef} [flags]\n`);
 
     const auth = manifest.config.auth;
     if (auth?.env) {
@@ -227,7 +234,7 @@ export function showApiHelp(manifest: Manifest, apiName: string, path: string[],
         console.log(`  ${name.padEnd(28)}${req}${desc}`);
       }
       console.log('');
-      console.log(`Example:\n  godmode ${apiName} ${toolName} ${[...required].map((r) => `${r}=...`).join(' ')}`);
+      console.log(`Example:\n  godmode api ${apiName} ${toolName} ${[...required].map((r) => `${r}=...`).join(' ')}`);
       console.log('');
     } else {
       // REST: show method table
@@ -300,7 +307,7 @@ export function showApiHelp(manifest: Manifest, apiName: string, path: string[],
       ? fuzzysort.go(filter, candidates).map((r) => r.target)
       : candidates;
 
-    const prefix = `godmode ${apiName}${resourceName ? ' ' + resourceName : ''}`;
+    const prefix = `godmode api ${apiName}${resourceName ? ' ' + resourceName : ''}`;
     const label = filter || mf
       ? `Resources${filter ? ` matching "${filter}"` : ''}${mf ? ` with ${mf.toUpperCase()}${methodFilter !== mf ? ` (matched "${methodFilter}")` : ''}` : ''}:`
       : 'Resources:';

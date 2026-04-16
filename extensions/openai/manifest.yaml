@@ -1,0 +1,8 @@
+name: openai
+description: AI models and assistants API
+interfaces:
+  api:
+    spec: https://raw.githubusercontent.com/openai/openai-openapi/refs/heads/manual_spec/openapi.yaml
+    url: https://api.openai.com
+auth:
+  env: OPENAI_API_KEY

@@ -63,7 +63,7 @@ function buildTestCases(name: string, manifest: Manifest) {
 
       acc.push({
         label: `${route.method.toUpperCase()} ${route.path}`,
-        args: [name, ...segments, ...flags, '--dry-run'],
+        args: ['api', name, ...segments, ...flags, '--dry-run'],
         expected: `${manifest.config.url}${expectedPath}`,
       });
       return acc;
@@ -71,13 +71,13 @@ function buildTestCases(name: string, manifest: Manifest) {
 }
 
 export function testAdapter(name: string, configPath: string) {
-  describe(`${name} adapter`, () => {
+  describe(`${name} extension`, () => {
     let cases: ReturnType<typeof buildTestCases>;
 
     beforeAll(() => {
-      const list = gm('list');
+      const list = gm('extension', 'list');
       if (!list.includes(name)) {
-        const result = gm('add', configPath);
+        const result = gm('extension', 'add', configPath);
         if (result.includes('Error') || result.includes('failed')) {
           throw new Error(`Failed to add ${name}: ${result}`);
         }
@@ -97,7 +97,7 @@ export function testAdapter(name: string, configPath: string) {
     });
 
     it('--help shows usage and resources', () => {
-      const out = gm(name, '--help');
+      const out = gm('api', name, '--help');
       expect(out).toContain('Usage:');
       expect(out).toContain('Resources:');
     });
