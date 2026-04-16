@@ -6,3 +6,4 @@ dist
 .output
 .source
 .tanstack
+.vercel
