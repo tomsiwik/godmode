@@ -6,7 +6,7 @@ export const Container = ({ className, children, asGrid = false, props }: { clas
             {...props}
             className="@container grid grid-cols-[auto_1fr_auto] xl:grid-cols-[1fr_auto_1fr]">
             <Decorator />
-            <div className={cn('max-w-276 xl:min-w-276 mx-auto w-full', !asGrid && 'p-[0.5px]')}>
+            <div className={cn('max-w-[90rem] xl:min-w-[90rem] mx-auto w-full', !asGrid && 'p-[0.5px]')}>
                 {asGrid ? (
                     <div className={cn('dark:bg-white/[0.12] **:data-grid-content:bg-card/90 **:data-grid-content:h-full **:data-grid-content:rounded grid *:p-[0.5px]', className)}>{children}</div>
                 ) : (
