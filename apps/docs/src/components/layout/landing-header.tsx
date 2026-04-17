@@ -10,11 +10,8 @@ export function LandingHeader() {
   return (
     <header className="sticky top-0 z-40 backdrop-blur-sm bg-fd-background/80 border-b border-fd-border/50">
       <div className="mx-auto max-w-(--fd-layout-width) flex items-center px-4 md:px-6 h-18">
-        <a
-          href="/"
-          aria-label="home"
-          className="text-fd-foreground text-lg font-semibold tracking-tight">
-          godmode
+        <a href="/" aria-label="home" className="flex items-center">
+          <img src="/godmode-nav.svg" alt="godmode" className="h-7 dark:invert" />
         </a>
         <div className="flex flex-1 items-center justify-end gap-2">
           <a

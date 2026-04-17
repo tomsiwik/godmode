@@ -13,7 +13,7 @@ export function baseOptions(): BaseLayoutProps {
   return {
     nav: {
       title: (
-        <span className="text-lg font-semibold tracking-tight">godmode</span>
+        <img src="/godmode-nav.svg" alt="godmode" className="h-7 dark:invert" />
       ),
       url: '/',
     },

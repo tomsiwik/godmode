@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 5 7" shape-rendering="crispEdges">
+  <style>
+    rect { fill: black; }
+    @media (prefers-color-scheme: dark) {
+      rect { fill: white; }
+    }
+  </style>
+  <rect x="4" y="0" width="1" height="1"/>
+  <rect x="3" y="1" width="1" height="1"/>
+  <rect x="2" y="2" width="1" height="1"/>
+  <rect x="1" y="3" width="1" height="1"/>
+  <rect x="0" y="4" width="1" height="1"/>
+</svg>
