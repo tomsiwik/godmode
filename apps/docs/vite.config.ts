@@ -5,6 +5,8 @@ import tailwindcss from '@tailwindcss/vite';
 import mdx from 'fumadocs-mdx/vite';
 import { nitro } from 'nitro/vite';
 
+const isVercel = process.env.VERCEL === '1';
+
 export default defineConfig({
   server: {
     port: Number(process.env.PORT) || 3000,
@@ -13,7 +15,19 @@ export default defineConfig({
   plugins: [
     mdx(await import('./source.config')),
     tailwindcss(),
-    tanstackStart(),
+    tanstackStart(
+      isVercel
+        ? {}
+        : {
+            spa: {
+              enabled: true,
+              prerender: {
+                enabled: true,
+                crawlLinks: true,
+              },
+            },
+          },
+    ),
     react(),
     nitro({
       preset: 'vercel',
