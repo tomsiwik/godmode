@@ -2,10 +2,8 @@
   <img src="assets/godmode-pixels.svg" alt="godmode" width="360" />
 </p>
 
-<h2 align="center">Godmode</h2>
-
 <p align="center">
-  any API as CLI. any API as MCP. zero code generation.
+  Agent sandboxed? Give it this tool only `Bash(godmode:*)` for save plug & play extensions
 </p>
 
 <p align="center">
