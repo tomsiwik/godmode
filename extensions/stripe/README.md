@@ -5,7 +5,7 @@ Stripe extension for [Godmode](https://godmode.so).
 ## Install
 
 ```sh
-godmode extension add stripe
+godmode ext install stripe
 ```
 
 ## Environment
@@ -21,7 +21,7 @@ export STRIPE_API_KEY=sk_...
   "mcpServers": {
     "stripe": {
       "command": "godmode",
-      "args": ["mcp", "stripe"]
+      "args": ["stripe", "mcp"]
     }
   }
 }

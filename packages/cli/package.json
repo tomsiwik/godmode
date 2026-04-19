@@ -25,7 +25,8 @@
   },
   "exports": {
     "./spec": "./src/spec.ts",
-    "./config": "./src/config.ts"
+    "./config": "./src/config.ts",
+    "./help": "./src/help.ts"
   },
   "files": [
     "dist",

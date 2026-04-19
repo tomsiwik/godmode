@@ -5,7 +5,7 @@ Slack extension for [Godmode](https://godmode.so).
 ## Install
 
 ```sh
-godmode extension add slack
+godmode ext install slack
 ```
 
 ## Environment
@@ -21,7 +21,7 @@ export SLACK_TOKEN=xoxb-...
   "mcpServers": {
     "slack": {
       "command": "godmode",
-      "args": ["mcp", "slack"]
+      "args": ["slack", "mcp"]
     }
   }
 }

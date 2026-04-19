@@ -19,8 +19,8 @@ interface MultiManifest {
 }
 interface FlatView { url: string; type: InterfaceData['type']; routes: Route[] }
 
-const METHOD_FLAG: Record<string, string[]> = {
-  get: ['-g'], post: ['-po'], put: ['-pu'], patch: ['-pa'], delete: ['-d'], head: ['--head'],
+const METHOD_POSITIONAL: Record<string, string> = {
+  get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', delete: 'DELETE', head: 'HEAD',
 };
 
 const CLI_DIR = resolve(import.meta.dirname, '..', '..', 'cli');
@@ -54,7 +54,7 @@ function loadManifest(name: string): MultiManifest {
   const base = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
     ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
     : resolve(homedir(), '.godmode');
-  return JSON.parse(readFileSync(resolve(base, 'apis', `${name}.json`), 'utf-8'));
+  return JSON.parse(readFileSync(resolve(base, 'extensions', `${name}.json`), 'utf-8'));
 }
 
 function primaryInterface(multi: MultiManifest): FlatView {
@@ -90,16 +90,17 @@ function buildTestCases(name: string, multi: MultiManifest) {
     .filter((r) => !shadowed.has(`${r.method}:${r.path}`))
     .reduce<Array<{ label: string; args: string[]; expected: string }>>((acc, route) => {
       const segments = route.segments.map((s) => (s.isParam ? `test_${s.value}` : s.value));
-      const flags = METHOD_FLAG[route.method] || [];
+      const methodPositional = METHOD_POSITIONAL[route.method];
 
       let expectedPath = route.path;
       for (const s of route.segments) {
         if (s.isParam) expectedPath = expectedPath.replace(`{${s.value}}`, `test_${s.value}`);
       }
 
+      const leading = (view.type === 'api' || view.type === 'graphql') && methodPositional ? [methodPositional] : [];
       acc.push({
         label: `${route.method.toUpperCase()} ${route.path}`,
-        args: [name, view.type, ...segments, ...flags, '--dry-run'],
+        args: [name, view.type, ...leading, ...segments, '--dry-run'],
         expected: view.type === 'mcp'
           ? `CALL ${view.url} → ${route.path}`
           : `${view.url}${expectedPath}`,

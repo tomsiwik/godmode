@@ -1,6 +1,6 @@
 import { resolve, basename, dirname, extname } from 'node:path';
 import { homedir } from 'node:os';
-import { mkdir, readFile, writeFile, readdir, unlink, access } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, readdir, unlink, access, rename } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -15,12 +15,27 @@ import {
 export const GODMODE_HOME = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
   ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
   : resolve(homedir(), '.godmode');
-const APIS_DIR = resolve(GODMODE_HOME, 'apis');
+
+/** Where compiled extension manifests live. Override with the
+ *  `GODMODE_EXTENSIONS_DIR` environment variable (absolute or relative path;
+ *  relative paths resolve against `process.cwd()`). */
+export const GODMODE_EXTENSIONS_DIR = process.env.GODMODE_EXTENSIONS_DIR
+  ? resolve(process.env.GODMODE_EXTENSIONS_DIR)
+  : resolve(GODMODE_HOME, 'extensions');
+
+/** Legacy pre-0.x location; migrated once on first run if present. */
+const LEGACY_APIS_DIR = resolve(GODMODE_HOME, 'apis');
 
 const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
 
 async function ensureDirs() {
-  await mkdir(APIS_DIR, { recursive: true });
+  // One-time migration from the pre-rename layout. Silent when nothing to do.
+  if ((await exists(LEGACY_APIS_DIR)) && !(await exists(GODMODE_EXTENSIONS_DIR))) {
+    await mkdir(dirname(GODMODE_EXTENSIONS_DIR), { recursive: true });
+    await rename(LEGACY_APIS_DIR, GODMODE_EXTENSIONS_DIR);
+    process.stderr.write(`Migrated ${LEGACY_APIS_DIR} -> ${GODMODE_EXTENSIONS_DIR}\n`);
+  }
+  await mkdir(GODMODE_EXTENSIONS_DIR, { recursive: true });
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -128,7 +143,7 @@ export async function addApi(input: string) {
         (multi.interfaces as Record<string, unknown>)[iface] = data;
       }
 
-      await writeFile(resolve(APIS_DIR, `${name}.json`), JSON.stringify(multi, null, 2));
+      await writeFile(resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`), JSON.stringify(multi, null, 2));
 
       const ifaceSummary = ifaceKeys
         .map((k) => {
@@ -171,7 +186,7 @@ export async function updateApi(name: string) {
 
 export async function removeApi(name: string) {
   try {
-    await unlink(resolve(APIS_DIR, `${name}.json`));
+    await unlink(resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`));
     process.stderr.write(`Removed "${name}"\n`);
   } catch {
     process.stderr.write(`Extension "${name}" not found\n`);
@@ -181,14 +196,14 @@ export async function removeApi(name: string) {
 
 export async function listApis() {
   await ensureDirs();
-  const files = await readdir(APIS_DIR);
+  const files = await readdir(GODMODE_EXTENSIONS_DIR);
   const apis = files.filter((f) => f.endsWith('.json'));
   if (!apis.length) {
     console.log('No extensions registered. Create a manifest.yaml and run: godmode extension add <name>');
     return;
   }
   for (const file of apis) {
-    const m: MultiManifest = JSON.parse(await readFile(resolve(APIS_DIR, file), 'utf-8'));
+    const m: MultiManifest = JSON.parse(await readFile(resolve(GODMODE_EXTENSIONS_DIR, file), 'utf-8'));
     const ifaces = Object.keys(m.interfaces).join(', ');
     const desc = m.description ? `  ${m.description}` : '';
     const routeTotal = Object.values(m.interfaces).reduce((n, d) => n + (d?.routes.length ?? 0), 0);
@@ -199,7 +214,7 @@ export async function listApis() {
 export async function loadMultiManifest(name: string): Promise<MultiManifest> {
   await ensureDirs();
   try {
-    return JSON.parse(await readFile(resolve(APIS_DIR, `${name}.json`), 'utf-8'));
+    return JSON.parse(await readFile(resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`), 'utf-8'));
   } catch {
     process.stderr.write(`Extension "${name}" not found. Create ${name}.yaml and run: godmode extension add ${name}\n`);
     process.exit(1);

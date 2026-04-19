@@ -1,5 +1,21 @@
 {
-  "title": "Getting Started",
+  "title": "Docs",
   "root": true,
-  "pages": ["index"]
+  "pages": [
+    "index",
+    "---Getting Started---",
+    "installation",
+    "extensions",
+    "---CLI---",
+    "usage",
+    "discovery",
+    "agent",
+    "---Authentication---",
+    "env-vars",
+    "auth-types",
+    "---Integrations---",
+    "claude-code",
+    "cursor",
+    "other-mcp-clients"
+  ]
 }

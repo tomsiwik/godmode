@@ -265,26 +265,346 @@ function methodLabels(node: TrieNode): string {
   return order.filter((m) => methods.has(m)).map((m) => METHOD_LABEL[m]).join(' ');
 }
 
-// ── showHelp ────────────────────────────────────────────────
+// ── HelpPage class system ────────────────────────────────────
 
-export function showHelp() {
-  console.log(`A control surface of agentic I/O.
+export interface AuthNote {
+  env: string;
+  authType: 'bearer' | 'api-key' | 'basic';
+  present: boolean;
+}
 
-Usage: godmode <extension> [args]...
-   or: godmode <extension> <interface> [args]...
+export interface Footer {
+  reportBugs?: string;
+  homepage?: string;
+  /** Free-form lines rendered before the report-bugs/homepage block. */
+  extras?: string[];
+}
 
-Built-in extensions:
-  ext                    Install and manage godmode extensions
-  agent                  Coding-agent workflows
+export interface HelpPageData {
+  title: string | null;
+  tagline: string | null;
+  authNote: AuthNote | null;
+  usage: string[];
+  sections: HelpSection[];
+  footer: Footer | null;
+}
 
-Options:
-  -v, --version          output version information and exit
+/**
+ * Base help page. Subclasses override the hooks to declare what to show;
+ * render() walks them in a consistent order. toJSON() returns the whole
+ * page as structured data — useful for machine-readable export or tests.
+ */
+export abstract class HelpPage {
+  title(): string | null { return null; }
+  tagline(): string | null { return null; }
+  authNote(): AuthNote | null { return null; }
+  usage(): string[] { return []; }
+  sections(): HelpSection[] { return []; }
+  footer(): Footer | null { return null; }
 
-Run "godmode ext list" to see installed extensions.
-Run "godmode <extension> --help" for extension-specific usage.
+  toJSON(): HelpPageData {
+    return {
+      title: this.title(),
+      tagline: this.tagline(),
+      authNote: this.authNote(),
+      usage: this.usage(),
+      sections: this.sections(),
+      footer: this.footer(),
+    };
+  }
 
-Report bugs to <https://github.com/tomsiwik/godmode/issues>.
-Godmode home page: <https://godmode.so>.`);
+  render(): void {
+    const d = this.toJSON();
+    let wrote = false;
+    if (d.title) { console.log(d.title); wrote = true; }
+    if (d.tagline) {
+      if (wrote) console.log('');
+      console.log(d.tagline);
+      wrote = true;
+    }
+    if (d.authNote && !d.authNote.present) {
+      const arrow = USE_COLOR ? `${RED}-->${RESET}` : '-->';
+      const label = authMissingLabel(d.authNote.authType);
+      const body = USE_COLOR ? `${RED}${label}${RESET}` : label;
+      if (wrote) console.log('');
+      console.log(`${arrow} ${d.authNote.env}: ${body}`);
+      wrote = true;
+    }
+    if (d.usage.length) {
+      if (wrote) console.log('');
+      for (let i = 0; i < d.usage.length; i++) {
+        const prefix = i === 0 ? 'Usage:' : '   or:';
+        console.log(`${prefix} ${d.usage[i]}`);
+      }
+      wrote = true;
+    }
+    renderSections(d.sections);
+    if (d.footer) {
+      if (d.footer.extras?.length) {
+        console.log('');
+        for (const line of d.footer.extras) console.log(line);
+      }
+      if (d.footer.reportBugs || d.footer.homepage) {
+        console.log('');
+        if (d.footer.reportBugs) console.log(`Report bugs to <${d.footer.reportBugs}>.`);
+        if (d.footer.homepage) console.log(`Godmode home page: <${d.footer.homepage}>.`);
+      }
+    }
+  }
+}
+
+// ── concrete pages ──────────────────────────────────────────
+
+export class RootHelp extends HelpPage {
+  tagline() { return 'A control surface of agentic I/O.'; }
+  usage() {
+    return [
+      'godmode <extension> [args]...',
+      'godmode <extension> <interface> [args]...',
+    ];
+  }
+  sections() {
+    return [
+      { title: 'Built-in extensions:', rows: [
+        ['ext', 'Install and manage godmode extensions'],
+        ['agent', 'Coding-agent workflows'],
+      ] as string[][] },
+      { title: 'Options:', rows: ROOT_OPTION_ROWS as string[][] },
+    ];
+  }
+  footer(): Footer {
+    return {
+      extras: [
+        'Run "godmode ext list" to see installed extensions.',
+        'Run "godmode <extension> --help" for extension-specific usage.',
+      ],
+      reportBugs: 'https://github.com/tomsiwik/godmode/issues',
+      homepage: 'https://godmode.so',
+    };
+  }
+}
+
+export class ExtHelp extends HelpPage {
+  tagline() { return 'Install, inspect, and manage godmode extensions.'; }
+  usage() { return ['godmode ext <command> [args]']; }
+  sections() {
+    return [
+      { title: 'Commands:', rows: [
+        ['install <name|folder>', 'Install an extension'],
+        ['uninstall <name>', 'Uninstall an extension'],
+        ['update <name>', 'Re-fetch spec, rebuild routes'],
+        ['list', 'Show installed extensions'],
+        ['create', 'Interactive manifest wizard'],
+      ] as string[][] },
+    ];
+  }
+}
+
+export class ExtensionOverview extends HelpPage {
+  constructor(protected multi: MultiManifest) { super(); }
+  title() { return titleCase(this.multi.name || this.multi.slug); }
+  usage() {
+    const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
+    const args = (iface: InterfaceKey) =>
+      iface === 'mcp' ? ' <tool> [args]' :
+      iface === 'graphql' ? ' <query> [flags]' :
+      ' <method> <resource> [id] [flags]';
+    return declared.map((iface) => `godmode ${this.multi.slug} ${iface}${args(iface)}`);
+  }
+  sections() {
+    const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
+    return [
+      { title: 'Interfaces:', rows: declared.map((iface) => {
+        const d = this.multi.interfaces[iface];
+        const url = d && 'url' in d && d.url ? d.url : '(local)';
+        return [iface, url];
+      }) as string[][] },
+      { title: 'Options:', rows: [['-v, --version', 'show extension spec versions']] as string[][] },
+    ];
+  }
+}
+
+export class ExtensionVersionPage extends HelpPage {
+  constructor(protected multi: MultiManifest) { super(); }
+  title() { return titleCase(this.multi.name || this.multi.slug); }
+  sections() {
+    const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
+    return [
+      { title: '', rows: declared.map((iface) => {
+        const d = this.multi.interfaces[iface];
+        return [iface, d?.specVersion || '(unversioned)'];
+      }) as string[][] },
+    ];
+  }
+}
+
+export interface InterfaceHelpOpts {
+  multi?: MultiManifest;
+  filter?: string;
+  methodFilter?: string;
+  all?: boolean;
+}
+
+export class InterfaceHelp extends HelpPage {
+  constructor(
+    protected manifest: Manifest,
+    protected apiName: string,
+    rawPath: string[] = [],
+    protected opts: InterfaceHelpOpts = {},
+  ) {
+    super();
+    // Be forgiving in help mode: if the user typed `resource METHOD --help`,
+    // strip the trailing verb so we can still navigate to the resource page.
+    const HTTP_VERBS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
+    const cleaned = [...rawPath];
+    while (cleaned.length && HTTP_VERBS.has(cleaned[cleaned.length - 1].toUpperCase())) {
+      cleaned.pop();
+    }
+    this.path = cleaned;
+  }
+
+  protected path: string[];
+
+  protected get ifaceType(): InterfaceKey { return this.manifest.config.type; }
+
+  protected getNav() {
+    const root = buildTrie(this.manifest.routes);
+    return navigateTrie(root, this.path);
+  }
+
+  title() {
+    if (this.path.length) return null;
+    return `${titleCase(this.manifest.config.name || this.apiName)} ${INTERFACE_LABEL[this.ifaceType] || this.ifaceType}`;
+  }
+
+  authNote(): AuthNote | null {
+    const auth = this.manifest.config.auth;
+    if (!auth?.env) return null;
+    return {
+      env: auth.env,
+      authType: (auth.type || 'bearer') as AuthNote['authType'],
+      present: !!process.env[auth.env],
+    };
+  }
+
+  usage() {
+    if (!this.path.length) {
+      const multi = this.opts.multi;
+      const declared: InterfaceKey[] = multi
+        ? (Object.keys(multi.interfaces) as InterfaceKey[])
+        : [this.ifaceType];
+      const ordered = [this.ifaceType, ...declared.filter((k) => k !== this.ifaceType)];
+      const args = (iface: InterfaceKey) =>
+        iface === 'mcp' ? ' <tool> [args]' :
+        iface === 'graphql' ? ' <query> [flags]' :
+        ' <method> <resource> [id] [flags]';
+      return ordered.map((iface) => `godmode ${this.apiName} ${iface}${args(iface)}`);
+    }
+    const nav = this.getNav();
+    if (!nav) return [];
+    const paramHint = getParamName(nav.node);
+    const idRef = paramHint ? ` [${paramHint}]` : '';
+    // Method is required and goes right after the interface keyword.
+    const methodSlot = this.ifaceType === 'api' ? '<method> ' : '';
+    return [`godmode ${this.apiName} ${this.ifaceType} ${methodSlot}${nav.fullPath.join(' ')}${idRef} [flags]`];
+  }
+
+  sections() {
+    const nav = this.getNav();
+    if (!nav) return [];
+    const sections: HelpSection[] = [];
+
+    if (!this.path.length) {
+      if (this.ifaceType === 'api') {
+        const methodsPresent = new Set(this.manifest.routes.map((r) => r.method.toLowerCase()));
+        const METHOD_DESC: Record<string, string> = {
+          get: 'retrieve a resource',
+          post: 'create a resource or send a command',
+          put: 'replace a resource',
+          patch: 'modify a resource',
+          delete: 'remove a resource',
+          head: 'retrieve headers only',
+        };
+        const order = ['get', 'post', 'put', 'patch', 'delete', 'head'] as const;
+        const methodsHere = order.filter((m) => methodsPresent.has(m));
+        if (methodsHere.length) {
+          sections.push({
+            title: 'Methods:',
+            rows: methodsHere.map((m) => [METHOD_LABEL[m] || m.toUpperCase(), METHOD_DESC[m]]),
+          });
+        }
+      }
+    } else {
+      // Drilled-in: MCP tool params OR REST method combinations for this resource
+      const mcpTools = (this.manifest.config as { _mcpTools?: Array<{ name: string; description?: string; inputSchema?: { properties?: Record<string, { type: string; description?: string }>; required?: string[] } }> })._mcpTools;
+      const mcpTool = mcpTools?.find((t) => t.name === this.path[this.path.length - 1]);
+      if (mcpTool?.inputSchema?.properties) {
+        const props = mcpTool.inputSchema.properties;
+        const required = new Set<string>(mcpTool.inputSchema.required || []);
+        const rows: string[][] = [];
+        for (const [name, schema] of Object.entries(props)) {
+          const req = required.has(name) ? `${RED}[REQUIRED]${RESET}` : '';
+          const desc = schema.description ? `${ITALIC}${schema.description}${RESET}` : '';
+          rows.push([name, req, desc]);
+        }
+        sections.push({ title: 'Parameters:', rows });
+      } else {
+        const order = ['get', 'post', 'put', 'patch', 'delete'] as const;
+        const pc = nav.node.children.find((c) => c.isParam);
+        const items: Array<{ method: string; summary: string; needsId: boolean }> = [];
+        for (const ep of nav.node.methods) items.push({ method: ep.method, summary: ep.summary, needsId: false });
+        if (pc) for (const ep of pc.methods) items.push({ method: ep.method, summary: ep.summary, needsId: true });
+        if (items.length) {
+          const rows: string[][] = [];
+          for (const m of order) {
+            for (const r of items.filter((r) => r.method === m)) {
+              const label = METHOD_LABEL[m] || m.toUpperCase();
+              const idArg = r.needsId ? `<${pc!.name}>` : '';
+              const desc = r.summary ? `${ITALIC}${r.summary}${RESET}` : '';
+              rows.push([label, idArg, desc]);
+            }
+          }
+          sections.push({ title: 'Methods:', rows });
+        }
+      }
+    }
+
+    const children = getChildren(nav.node).filter((c) => !c.isParam);
+    const childNames = [...new Set(children.map((c) => c.name))];
+    const resourceSection = buildResourceSection(
+      children, childNames, this.manifest,
+      this.opts.filter, this.opts.methodFilter, this.opts.all,
+    );
+    if (resourceSection) sections.push(resourceSection.section);
+
+    sections.push({ title: 'Options:', rows: INTERFACE_OPTION_ROWS as string[][] });
+    return sections;
+  }
+
+  /** Drilled-in view also shows param status lines (ANSI-only). */
+  render() {
+    super.render();
+    // No-op: param status was TTY-only and mostly decorative. Kept out of
+    // the class contract to keep the structure pure.
+  }
+}
+
+// ── wrappers (kept for back-compat with existing callers) ──
+
+export function showHelp() { new RootHelp().render(); }
+export function showExtHelp() { new ExtHelp().render(); }
+export function showExtensionOverview(multi: MultiManifest) { new ExtensionOverview(multi).render(); }
+export function showExtensionVersion(multi: MultiManifest) { new ExtensionVersionPage(multi).render(); }
+export function showApiHelp(
+  manifest: Manifest,
+  apiName: string,
+  path: string[],
+  filter?: string,
+  methodFilter?: string,
+  all?: boolean,
+  multi?: MultiManifest,
+) {
+  new InterfaceHelp(manifest, apiName, path, { multi, filter, methodFilter, all }).render();
 }
 
 export async function showVersion() {
@@ -296,224 +616,6 @@ export async function showVersion() {
   const license = await readFile(resolve(root, 'LICENSE'), 'utf-8');
   const copyright = license.match(/^Copyright.*$/m)?.[0] ?? '';
   console.log(`godmode ${pkg.version}\n\n${pkg.license} License\n${copyright}`);
-}
-
-// ── showExtensionOverview (godmode <ext> --help) ────────────
-// Lean overview: just title, Usage-per-interface, Interfaces list,
-// Options, Global Options. No auth note, no Methods, no Resources —
-// those belong to the interface-scoped page.
-
-export function showExtensionOverview(multi: MultiManifest) {
-  const title = titleCase(multi.name || multi.slug);
-  console.log(title);
-
-  const declared = Object.keys(multi.interfaces) as InterfaceKey[];
-  const usageArgs = (iface: InterfaceKey) =>
-    iface === 'mcp' ? ' <tool> [args]' :
-    iface === 'graphql' ? ' <query> [flags]' :
-    ' [method] <resource> [id] [flags]';
-
-  console.log('');
-  for (let i = 0; i < declared.length; i++) {
-    const prefix = i === 0 ? 'Usage:' : '   or:';
-    console.log(`${prefix} godmode ${multi.slug} ${declared[i]}${usageArgs(declared[i])}`);
-  }
-
-  const sections: HelpSection[] = [];
-  sections.push({
-    title: 'Interfaces:',
-    rows: declared.map((iface) => {
-      const data = multi.interfaces[iface];
-      const url = data && 'url' in data && data.url ? data.url : '(local)';
-      return [iface, url];
-    }),
-  });
-  // Overview has no context flags (no interface selected). Only --version
-  // applies here, and it prints this extension's spec versions.
-  sections.push({
-    title: 'Options:',
-    rows: [['-v, --version', 'show extension spec versions']],
-  });
-  renderSections(sections);
-}
-
-/** Prints the extension's spec version(s) — one per declared interface. */
-export function showExtensionVersion(multi: MultiManifest) {
-  const declared = Object.keys(multi.interfaces) as InterfaceKey[];
-  console.log(titleCase(multi.name || multi.slug));
-  const rows: string[][] = declared.map((iface) => {
-    const data = multi.interfaces[iface];
-    const version = data?.specVersion || '(unversioned)';
-    return [iface, version];
-  });
-  printTable(rows);
-}
-
-// ── showApiHelp ─────────────────────────────────────────────
-
-export function showApiHelp(
-  manifest: Manifest,
-  apiName: string,
-  path: string[],
-  filter?: string,
-  methodFilter?: string,
-  all?: boolean,
-  multi?: MultiManifest,
-) {
-  const root = buildTrie(manifest.routes);
-  const nav = navigateTrie(root, path);
-  if (!nav) { console.log('No matching resource.'); return; }
-  const { node, fullPath } = nav;
-
-  const actions = getNodeActions(node);
-  const param = getParamName(node);
-  const children = getChildren(node).filter((c) => !c.isParam);
-  const childNames = [...new Set(children.map((c) => c.name))];
-  const resourceName = fullPath.join(' ');
-
-  const auth = manifest.config.auth;
-  const envOk = auth?.env ? !!process.env[auth.env] : true;
-  const ifaceType = manifest.config.type;
-
-  // Header
-  if (!path.length) {
-    const ifaceLabel = INTERFACE_LABEL[ifaceType] || ifaceType;
-    const title = `${titleCase(manifest.config.name || apiName)} ${ifaceLabel}`;
-
-    // Title only — version moved to `--version`; no inline noise.
-    console.log(title);
-
-    // Auth status note — surface only when credentials are missing.
-    if (auth?.env && !envOk) {
-      const arrow = USE_COLOR ? `${RED}-->${RESET}` : '-->';
-      const label = authMissingLabel(auth.type);
-      const body = USE_COLOR ? `${RED}${label}${RESET}` : label;
-      console.log(`${arrow} ${auth.env}: ${body}\n`);
-    }
-
-    // Primary invocation first, then one `or:` line per additional declared interface.
-    const declared: InterfaceKey[] = multi
-      ? (Object.keys(multi.interfaces) as InterfaceKey[])
-      : [ifaceType as InterfaceKey];
-    const ordered = [ifaceType as InterfaceKey, ...declared.filter((k) => k !== ifaceType)];
-
-    const usageArgs = (iface: InterfaceKey) =>
-      iface === 'mcp' ? ' <tool> [args]' :
-      iface === 'graphql' ? ' <query> [flags]' :
-      ' [method] <resource> [id] [flags]';
-
-    for (let i = 0; i < ordered.length; i++) {
-      const iface = ordered[i];
-      const prefix = i === 0 ? 'Usage:' : '   or:';
-      console.log(`${prefix} godmode ${apiName} ${iface}${usageArgs(iface)}`);
-    }
-
-    // Collect sections for globally-aligned render at tail.
-    // Interfaces section is only in the extension overview — inside an
-    // interface page the user already knows which one they're looking at.
-    const sections: HelpSection[] = [];
-
-    if (ifaceType === 'api') {
-      const methodsPresent = new Set(manifest.routes.map((r) => r.method.toLowerCase()));
-      const METHOD_DESC: Record<string, string> = {
-        get: 'retrieve a resource',
-        post: 'create a resource or send a command',
-        put: 'replace a resource',
-        patch: 'modify a resource',
-        delete: 'remove a resource',
-        head: 'retrieve headers only',
-      };
-      const order = ['get', 'post', 'put', 'patch', 'delete', 'head'] as const;
-      const methodsHere = order.filter((m) => methodsPresent.has(m));
-      if (methodsHere.length) {
-        sections.push({
-          title: 'Methods:',
-          rows: methodsHere.map((m) => [METHOD_LABEL[m] || m.toUpperCase(), METHOD_DESC[m]]),
-        });
-      }
-    }
-
-    // Resources section (sub-resources at this level)
-    const resourceSection = buildResourceSection(
-      children,
-      childNames,
-      manifest,
-      filter,
-      methodFilter,
-      all,
-    );
-    if (resourceSection) sections.push(resourceSection.section);
-
-    // Options + Global Options — always
-    sections.push({ title: 'Options:', rows: INTERFACE_OPTION_ROWS as string[][] });
-
-    renderSections(sections);
-    return;
-  } else {
-    // Drilled-in view (path.length > 0)
-    const paramHint = getParamName(node);
-    const idRef = paramHint ? ` [${paramHint}]` : '';
-
-    if (auth?.env && !envOk) {
-      const arrow = USE_COLOR ? `${RED}-->${RESET}` : '-->';
-      const label = authMissingLabel(auth.type);
-      const body = USE_COLOR ? `${RED}${label}${RESET}` : label;
-      console.log(`${arrow} ${auth.env}: ${body}\n`);
-    }
-    console.log(`Usage: godmode ${apiName} ${ifaceType} ${resourceName}${idRef} [flags]`);
-
-    if (USE_COLOR) {
-      for (const p of nav.params) {
-        const status = p.provided ? `${GREEN}(${p.value})${RESET}` : `${RED}(missing parameter)${RESET}`;
-        console.log(`<${p.name}> ${status}`);
-      }
-      if (nav.params.length) console.log('');
-    }
-
-    const sections: HelpSection[] = [];
-
-    // MCP tool params (if navigating into an MCP tool)
-    const mcpTools = (manifest.config as { _mcpTools?: Array<{ name: string; description?: string; inputSchema?: { properties?: Record<string, { type: string; description?: string }>; required?: string[] } }> })._mcpTools;
-    const mcpTool = mcpTools?.find((t) => t.name === path[path.length - 1]);
-    if (mcpTool?.inputSchema?.properties) {
-      const props = mcpTool.inputSchema.properties;
-      const required = new Set<string>(mcpTool.inputSchema.required || []);
-      const rows: string[][] = [];
-      for (const [name, schema] of Object.entries(props)) {
-        const req = required.has(name) ? `${RED}[REQUIRED]${RESET}` : '';
-        const desc = schema.description ? `${ITALIC}${schema.description}${RESET}` : '';
-        rows.push([name, req, desc]);
-      }
-      sections.push({ title: 'Parameters:', rows });
-    } else {
-      // REST method combinations for this resource
-      const order = ['get', 'post', 'put', 'patch', 'delete'] as const;
-      const pc = node.children.find((c) => c.isParam);
-      const rows: Array<{ method: string; summary: string; needsId: boolean }> = [];
-      for (const ep of node.methods) rows.push({ method: ep.method, summary: ep.summary, needsId: false });
-      if (pc) for (const ep of pc.methods) rows.push({ method: ep.method, summary: ep.summary, needsId: true });
-
-      if (rows.length) {
-        const tableRows: string[][] = [];
-        for (const m of order) {
-          for (const r of rows.filter((r) => r.method === m)) {
-            const label = METHOD_LABEL[m] || m.toUpperCase();
-            const idArg = r.needsId ? `<${pc!.name}>` : '';
-            const desc = r.summary ? `${ITALIC}${r.summary}${RESET}` : '';
-            tableRows.push([label, idArg, desc]);
-          }
-        }
-        sections.push({ title: 'Methods:', rows: tableRows });
-      }
-    }
-
-    const resourceSection = buildResourceSection(children, childNames, manifest, filter, methodFilter, all);
-    if (resourceSection) sections.push(resourceSection.section);
-
-    sections.push({ title: 'Options:', rows: INTERFACE_OPTION_ROWS as string[][] });
-
-    renderSections(sections);
-  }
 }
 
 // ── section builders ──────────────────────────────────────────

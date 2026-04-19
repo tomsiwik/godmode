@@ -8,8 +8,8 @@ interface Segment { value: string; isParam: boolean }
 interface Route { path: string; method: string; version: string; segments: Segment[] }
 interface Manifest { name: string; config: { url: string }; routes: Route[]; versions: Array<{ name: string }> }
 
-const METHOD_FLAG: Record<string, string[]> = {
-  get: ['-g'], post: ['-po'], put: ['-pu'], patch: ['-pa'], delete: ['-d'], head: ['--head'],
+const METHOD_POSITIONAL: Record<string, string> = {
+  get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', delete: 'DELETE', head: 'HEAD',
 };
 
 export const gm = (...args: string[]) => {
@@ -35,7 +35,7 @@ function loadManifest(name: string): Manifest {
   const base = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
     ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
     : resolve(homedir(), '.godmode');
-  return JSON.parse(readFileSync(resolve(base, 'apis', `${name}.json`), 'utf-8'));
+  return JSON.parse(readFileSync(resolve(base, 'extensions', `${name}.json`), 'utf-8'));
 }
 
 function buildTestCases(name: string, manifest: Manifest) {
@@ -62,7 +62,7 @@ function buildTestCases(name: string, manifest: Manifest) {
     .filter((r) => !shadowed.has(`${r.method}:${r.path}`))
     .reduce<Array<{ label: string; args: string[]; expected: string }>>((acc, route) => {
       const segments = route.segments.map((s) => (s.isParam ? `test_${s.value}` : s.value));
-      const flags = METHOD_FLAG[route.method] || [];
+      const methodPositional = METHOD_POSITIONAL[route.method];
 
       let expectedPath = route.path;
       for (const s of route.segments) {
@@ -71,7 +71,7 @@ function buildTestCases(name: string, manifest: Manifest) {
 
       acc.push({
         label: `${route.method.toUpperCase()} ${route.path}`,
-        args: ['api', name, ...segments, ...flags, '--dry-run'],
+        args: ['api', name, methodPositional, ...segments, '--dry-run'],
         expected: `${manifest.config.url}${expectedPath}`,
       });
       return acc;

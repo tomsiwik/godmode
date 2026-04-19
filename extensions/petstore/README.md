@@ -5,7 +5,7 @@ Petstore extension for [Godmode](https://godmode.so).
 ## Install
 
 ```sh
-godmode extension add petstore
+godmode ext install petstore
 ```
 
 ## Claude Code
@@ -15,7 +15,7 @@ godmode extension add petstore
   "mcpServers": {
     "petstore": {
       "command": "godmode",
-      "args": ["mcp", "petstore"]
+      "args": ["petstore", "mcp"]
     }
   }
 }

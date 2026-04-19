@@ -1,7 +1,15 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { loadEnv } from './env.js';
-import { removeApi, updateApi, listApis, loadManifest, loadMultiManifest, GODMODE_HOME } from './config.js';
+import {
+  removeApi,
+  updateApi,
+  listApis,
+  loadManifest,
+  loadMultiManifest,
+  GODMODE_HOME,
+  GODMODE_EXTENSIONS_DIR,
+} from './config.js';
 import type { InterfaceKey, MultiManifest } from './spec.js';
 import { matchRoute, suggestRoutes } from '@godmode-cli/interface-api/match';
 import { execute } from '@godmode-cli/interface-api/request';
@@ -97,7 +105,7 @@ async function main() {
 }
 
 function installedExtension(name: string): MultiManifest | null {
-  const extPath = resolve(GODMODE_HOME, 'apis', `${name}.json`);
+  const extPath = resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`);
   if (!existsSync(extPath)) return null;
   try {
     return JSON.parse(readFileSync(extPath, 'utf-8')) as MultiManifest;
@@ -243,6 +251,14 @@ async function runInterface(iface: string, extensionName: string, rest: string[]
     return;
   }
 
+  // For REST APIs, the HTTP method is a required positional. GraphQL and MCP
+  // don't use it (GraphQL always POSTs, MCP dispatches by tool name).
+  if (iface === 'api' && !parsed.explicitMethod) {
+    process.stderr.write(`Missing HTTP method. Try: godmode ${extensionName} api GET ${parsed.segments.join(' ')}\n`);
+    process.stderr.write(`Valid methods: GET, POST, PUT, PATCH, DELETE, HEAD.\n`);
+    process.exit(1);
+  }
+
   // ── graphql ──
 
   if (iface === 'graphql') {
@@ -282,14 +298,26 @@ async function runInterface(iface: string, extensionName: string, rest: string[]
   const match = matchRoute(manifest, parsed.segments, parsed.method);
 
   if (!match) {
+    // Helpful nudge: if a trailing segment looks like an HTTP verb, the user
+    // likely typed `resource METHOD` instead of `METHOD resource`.
+    const HTTP_VERBS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
+    const trailingVerb = parsed.segments
+      .map((s) => s.toUpperCase())
+      .find((s) => HTTP_VERBS.has(s));
+    if (trailingVerb) {
+      const rest = parsed.segments.filter((s) => s.toUpperCase() !== trailingVerb);
+      process.stderr.write(`No route matching: ${parsed.segments.join(' ')}\n`);
+      process.stderr.write(`Method goes first: try 'godmode ${extensionName} ${iface} ${trailingVerb} ${rest.join(' ')}'\n`);
+      process.exit(1);
+    }
+
     process.stderr.write(`No ${parsed.method.toUpperCase()} route matching: ${parsed.segments.join(' ')}\n`);
 
     for (const m of ['get', 'post', 'put', 'patch', 'delete'] as const) {
       if (m === parsed.method) continue;
       const alt = matchRoute(manifest, parsed.segments, m);
       if (alt) {
-        const flag = m === 'delete' ? '-d' : `--${m}`;
-        process.stderr.write(`  try: godmode ${extensionName} api ${parsed.segments.join(' ')} ${flag}\n`);
+        process.stderr.write(`  try: godmode ${extensionName} api ${m.toUpperCase()} ${parsed.segments.join(' ')}\n`);
       }
     }
 

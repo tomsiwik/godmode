@@ -35,7 +35,7 @@ export function LandingHeader() {
           </a>
           <ThemeToggle mode="light-dark-system" />
           <Button asChild size="sm">
-            <a href="/usage">
+            <a href="/docs">
               <span>Documentation</span>
             </a>
           </Button>

@@ -5,7 +5,7 @@ GitHub extension for [Godmode](https://godmode.so).
 ## Install
 
 ```sh
-godmode extension add github
+godmode ext install github
 ```
 
 ## Environment
@@ -21,7 +21,7 @@ export GITHUB_TOKEN=ghp_...
   "mcpServers": {
     "github": {
       "command": "godmode",
-      "args": ["mcp", "github"]
+      "args": ["github", "mcp"]
     }
   }
 }

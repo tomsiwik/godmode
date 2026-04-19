@@ -34,13 +34,6 @@ export function parseArgs(args: string[]): ParsedArgs {
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     switch (arg) {
-      // HTTP methods
-      case '-g':  case '--get':    method = 'get';    explicitMethod = true; break;
-      case '-po': case '--post':   method = 'post';   explicitMethod = true; break;
-      case '-pu': case '--put':    method = 'put';    explicitMethod = true; break;
-      case '-pa': case '--patch':  method = 'patch';  explicitMethod = true; break;
-      case '-d':  case '--delete': method = 'delete'; explicitMethod = true; break;
-      case '--head':               method = 'head';   explicitMethod = true; break;
       // Options
       case '-H': case '--header': {
         const val = args[++i];
@@ -57,12 +50,11 @@ export function parseArgs(args: string[]): ParsedArgs {
           process.stderr.write(`Unknown flag: ${arg}\n`);
           process.exit(1);
         }
-        // Positional HTTP method, only at the leading position (right after
-        // the interface, e.g. `godmode stripe api GET account`).
-        // Case-insensitive — `GET`, `get`, `Get` all work. Collision with a
-        // lowercase resource named `get` is theoretical; real specs don't use
-        // HTTP-verb names as paths.
-        if (!segments.length && HTTP_METHODS.has(arg.toUpperCase())) {
+        // HTTP method — required, only at the leading position (right after
+        // the interface, e.g. `godmode stripe api GET account`). Case-
+        // insensitive. Collision with a lowercase resource named `get` is
+        // theoretical; real specs don't use HTTP-verb names as paths.
+        if (!segments.length && !explicitMethod && HTTP_METHODS.has(arg.toUpperCase())) {
           method = arg.toLowerCase();
           explicitMethod = true;
           break;
@@ -79,9 +71,6 @@ export function parseArgs(args: string[]): ParsedArgs {
         }
     }
   }
-
-  // body fields imply POST if no method was explicitly set
-  if (Object.keys(body).length && !explicitMethod) method = 'post';
 
   return { segments, method, explicitMethod, headers, query, body, filter, methodFilter, all, verbose, dryRun, help };
 }

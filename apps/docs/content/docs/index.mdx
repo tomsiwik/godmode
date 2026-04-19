@@ -1,5 +1,62 @@
 ---
-title: Getting Started
-description: Turn any API into a CLI and MCP server
-redirect: /usage
+title: Documentation
+description: Everything you need to install godmode, invoke it from the terminal, authenticate extensions, and wire it into your agent of choice.
 ---
+
+## What's godmode?
+
+godmode is a CLI with one invocation grammar for everything you install — APIs, MCP servers, local commands. Each of those is an extension, and they all take the same shape on the command line.
+
+Because every call goes through godmode, extensions can scope what's reachable: a stripe extension can hide account edits, a filesystem extension can restrict paths, a database extension can forbid writes. The sandbox is inherent to the abstraction, not a feature layered on top.
+
+```sh
+godmode ext install stripe
+godmode stripe api customers cus_123     # REST call
+godmode stripe mcp                       # serve over MCP
+```
+
+## Grammar
+
+```
+godmode [extension] [interface] [args]...
+```
+
+- `[extension]` — something you installed with `godmode ext install [name]`, or one of the built-ins `ext` and `agent`.
+- `[interface]` — `api`, `graphql`, or `mcp`. Required for user extensions.
+- `[args]` — resources, tools, queries, or verbs — shape depends on the interface.
+
+The CLI is self-describing at every level:
+
+```sh
+godmode                                   # top-level: interfaces + built-ins
+godmode [extension] --help                # declared interfaces
+godmode [extension] [interface] --help    # methods, resources, options
+godmode [extension] [interface] [resource] --help
+```
+
+`--help` works at every nesting level and always prints the options actually available at that scope.
+
+## Interfaces
+
+- `api` — REST, driven by an OpenAPI spec. Example: `godmode stripe api customers limit==10`.
+- `graphql` — SDL file or introspected endpoint. Example: `godmode github graphql '{ viewer { login } }'`.
+- `mcp` — stdio or HTTP MCP servers. Example: `godmode context7 mcp <tool>`.
+
+Any extension can also be served as an MCP server so you can wire it into Claude Code, Cursor, or any MCP-compatible client:
+
+```json
+{
+  "mcpServers": {
+    "stripe": { "command": "godmode", "args": ["stripe", "mcp"] }
+  }
+}
+```
+
+## Where to go next
+
+- **Getting Started** — install the CLI and make your first call.
+- **CLI** — the grammar, `--help` discovery, and the built-in `ext` / `agent` extensions.
+- **Authentication** — env vars, `.env`, and the three credential types.
+- **Integrations** — wire godmode into Claude Code, Cursor, and other MCP clients.
+
+See the **Extensions** tab for the catalog of installable extensions, or **Developers** to author your own.

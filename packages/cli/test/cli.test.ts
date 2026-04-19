@@ -11,9 +11,9 @@ describe('core CLI', () => {
     const home = await mkdtemp(resolve(tmpdir(), 'godmode-cli-test-'));
     process.env.HOME = home;
     delete process.env.XDG_CONFIG_HOME;
-    await mkdir(resolve(home, '.godmode', 'apis'), { recursive: true });
+    await mkdir(resolve(home, '.godmode', 'extensions'), { recursive: true });
     await writeFile(
-      resolve(home, '.godmode', 'apis', 'stripe.json'),
+      resolve(home, '.godmode', 'extensions', 'stripe.json'),
       `${JSON.stringify({
         name: 'Stripe',
         slug: 'stripe',
@@ -57,32 +57,32 @@ describe('core CLI', () => {
   it.each([
     {
       name: 'key==value → query string',
-      args: ['stripe', 'api', 'customers', 'limit==10', '--dry-run'],
+      args: ['stripe', 'api', 'GET', 'customers', 'limit==10', '--dry-run'],
       expected: 'GET https://api.stripe.com/v1/customers?limit=10',
     },
     {
       name: 'multiple query params',
-      args: ['stripe', 'api', 'charges', 'limit==5', 'currency==usd', '--dry-run'],
+      args: ['stripe', 'api', 'GET', 'charges', 'limit==5', 'currency==usd', '--dry-run'],
       contains: ['limit=5', 'currency=usd'],
     },
     {
-      name: 'key=value → body (implies POST)',
-      args: ['stripe', 'api', 'customers', 'email=a@b.com', '--dry-run'],
+      name: 'POST with body fields',
+      args: ['stripe', 'api', 'POST', 'customers', 'email=a@b.com', '--dry-run'],
       contains: ['POST https://api.stripe.com/v1/customers', '"email":"a@b.com"'],
     },
     {
       name: 'multiple body fields',
-      args: ['stripe', 'api', 'customers', 'email=a@b.com', 'name=Test', '--dry-run'],
+      args: ['stripe', 'api', 'POST', 'customers', 'email=a@b.com', 'name=Test', '--dry-run'],
       contains: ['POST', '"email":"a@b.com"', '"name":"Test"'],
     },
     {
       name: 'body sets Content-Type',
-      args: ['stripe', 'api', 'customers', 'email=x', '--dry-run', '--verbose'],
+      args: ['stripe', 'api', 'POST', 'customers', 'email=x', '--dry-run', '--verbose'],
       contains: ['Content-Type: application/json'],
     },
     {
       name: 'query + body together',
-      args: ['stripe', 'api', 'customers', 'email=x', 'expand==sources', '--dry-run'],
+      args: ['stripe', 'api', 'POST', 'customers', 'email=x', 'expand==sources', '--dry-run'],
       contains: ['POST https://api.stripe.com/v1/customers?expand=sources', '"email":"x"'],
     },
   ])('$name', ({ args, expected, contains }) => {
@@ -91,23 +91,28 @@ describe('core CLI', () => {
     if (contains) for (const c of contains) expect(out).toContain(c);
   });
 
-  // ── method flags ──────────────────────────────────────
+  // ── method positionals (case-insensitive) ────────────
 
   it.each([
     {
-      name: '-po explicit POST',
-      args: ['stripe', 'api', 'customers', '-po', 'email=x', '--dry-run'],
+      name: 'lowercase post works',
+      args: ['stripe', 'api', 'post', 'customers', 'email=x', '--dry-run'],
       contains: ['POST https://api.stripe.com/v1/customers'],
     },
     {
-      name: '-d DELETE',
-      args: ['stripe', 'api', 'customers', 'cus_1', '-d', '--dry-run'],
+      name: 'DELETE',
+      args: ['stripe', 'api', 'DELETE', 'customers', 'cus_1', '--dry-run'],
       expected: 'DELETE https://api.stripe.com/v1/customers/cus_1',
     },
     {
-      name: '-g explicit GET',
-      args: ['stripe', 'api', 'customers', '-g', '--dry-run'],
+      name: 'GET',
+      args: ['stripe', 'api', 'GET', 'customers', '--dry-run'],
       expected: 'GET https://api.stripe.com/v1/customers',
+    },
+    {
+      name: 'missing method errors',
+      args: ['stripe', 'api', 'customers', '--dry-run'],
+      contains: ['Missing HTTP method'],
     },
   ])('$name', ({ args, expected, contains }) => {
     const out = gm(...args);
@@ -120,17 +125,17 @@ describe('core CLI', () => {
   it.each([
     {
       name: 'GET raw path',
-      args: ['stripe', 'api', '/v1/customers', '--dry-run'],
+      args: ['stripe', 'api', 'GET', '/v1/customers', '--dry-run'],
       expected: 'GET https://api.stripe.com/v1/customers',
     },
     {
       name: 'POST raw path with body',
-      args: ['stripe', 'api', '/v1/customers', 'email=x', '--dry-run'],
+      args: ['stripe', 'api', 'POST', '/v1/customers', 'email=x', '--dry-run'],
       contains: ['POST https://api.stripe.com/v1/customers', '"email":"x"'],
     },
     {
       name: 'DELETE raw path',
-      args: ['stripe', 'api', '/v1/customers/cus_123', '-d', '--dry-run'],
+      args: ['stripe', 'api', 'DELETE', '/v1/customers/cus_123', '--dry-run'],
       expected: 'DELETE https://api.stripe.com/v1/customers/cus_123',
     },
   ])('$name', ({ args, expected, contains }) => {
@@ -144,12 +149,12 @@ describe('core CLI', () => {
   it.each([
     {
       name: 'explicit v1 overrides v2',
-      args: ['stripe', 'api', 'v1', 'billing', 'meter_events', '-po', '--dry-run'],
+      args: ['stripe', 'api', 'POST', 'v1', 'billing', 'meter_events', '--dry-run'],
       contains: ['POST https://api.stripe.com/v1/billing/meter_events'],
     },
     {
       name: 'default picks latest (v2)',
-      args: ['stripe', 'api', 'billing', 'meter_events', '-po', '--dry-run'],
+      args: ['stripe', 'api', 'POST', 'billing', 'meter_events', '--dry-run'],
       contains: ['POST https://api.stripe.com/v2/billing/meter_events'],
     },
   ])('$name', ({ args, contains }) => {
@@ -161,7 +166,7 @@ describe('core CLI', () => {
   it.each([
     {
       name: '-H custom header',
-      args: ['stripe', 'api', 'account', '-H', 'X-Custom:value', '--dry-run', '--verbose'],
+      args: ['stripe', 'api', 'GET', 'account', '-H', 'X-Custom:value', '--dry-run', '--verbose'],
       contains: ['X-Custom: value'],
     },
   ])('$name', ({ args, contains }) => {
@@ -170,7 +175,7 @@ describe('core CLI', () => {
 
   it('missing auth errors with env var name', () => {
     if (process.env.STRIPE_API_KEY) return;
-    expect(gm('stripe', 'api', 'account')).toContain('Missing STRIPE_API_KEY');
+    expect(gm('stripe', 'api', 'GET', 'account')).toContain('Missing STRIPE_API_KEY');
   });
 
   // ── navigation ────────────────────────────────────────
@@ -198,8 +203,8 @@ describe('core CLI', () => {
   // ── errors ────────────────────────────────────────────
 
   it.each([
-    { name: 'wrong method', args: ['stripe', 'api', 'account', '-d'], contains: 'No DELETE route' },
-    { name: 'unknown resource', args: ['stripe', 'api', 'nonexistent'], contains: 'No GET route' },
+    { name: 'wrong method', args: ['stripe', 'api', 'DELETE', 'account'], contains: 'No DELETE route' },
+    { name: 'unknown resource', args: ['stripe', 'api', 'GET', 'nonexistent'], contains: 'No GET route' },
   ])('$name', ({ args, contains }) => {
     expect(gm(...args)).toContain(contains);
   });
@@ -237,7 +242,7 @@ describe('auth types', () => {
 
   beforeAll(async () => {
     const home = process.env.HOME!;
-    const apis = resolve(home, '.godmode', 'apis');
+    const apis = resolve(home, '.godmode', 'extensions');
     await mkdir(apis, { recursive: true });
     await writeFile(
       resolve(apis, 'authbearer.json'),
@@ -258,21 +263,21 @@ describe('auth types', () => {
       label: 'bearer puts token in Authorization: Bearer',
       envKey: 'AUTH_BEARER',
       envVal: 'tok_bearer_abc',
-      args: ['authbearer', 'api', 'ping', '--dry-run', '--verbose'],
+      args: ['authbearer', 'api', 'GET', 'ping', '--dry-run', '--verbose'],
       contains: 'Authorization: Bearer tok_bearer_abc',
     },
     {
       label: 'api-key puts token in custom header',
       envKey: 'AUTH_KEY',
       envVal: 'key_xyz',
-      args: ['authapikey', 'api', 'ping', '--dry-run', '--verbose'],
+      args: ['authapikey', 'api', 'GET', 'ping', '--dry-run', '--verbose'],
       contains: 'X-Custom-Key: key_xyz',
     },
     {
       label: 'basic puts token in Authorization: Basic',
       envKey: 'AUTH_BASIC',
       envVal: 'dXNlcjpwYXNz',
-      args: ['authbasic', 'api', 'ping', '--dry-run', '--verbose'],
+      args: ['authbasic', 'api', 'GET', 'ping', '--dry-run', '--verbose'],
       contains: 'Authorization: Basic dXNlcjpwYXNz',
     },
   ])('$label', ({ envKey, envVal, args, contains }) => {
@@ -288,13 +293,13 @@ describe('auth types', () => {
   it('bearer is the default when type is omitted', async () => {
     const home = process.env.HOME!;
     await writeFile(
-      resolve(home, '.godmode', 'apis', 'authdefault.json'),
+      resolve(home, '.godmode', 'extensions', 'authdefault.json'),
       `${JSON.stringify(authFixture('authdefault', { env: 'AUTH_DEFAULT', type: 'bearer' }), null, 2)}\n`,
     );
     process.env.AUTH_DEFAULT = 'default_tok';
     try {
       expect(
-        gm('authdefault', 'api', 'ping', '--dry-run', '--verbose'),
+        gm('authdefault', 'api', 'GET', 'ping', '--dry-run', '--verbose'),
       ).toContain('Authorization: Bearer default_tok');
     } finally {
       delete process.env.AUTH_DEFAULT;

@@ -1,64 +1,11 @@
 ---
-title: Custom Extensions
-description: Build your own extension
+title: Developers
+description: Build, publish, and customize godmode extensions.
 ---
 
-## Overview
+Everything you need to ship an extension — from the manifest schema to publishing on npm.
 
-Godmode extensions are plug-and-play. Create a `manifest.yaml`, register it, and your OpenAPI-compliant/GraphQL API is available as both a CLI and an MCP server. No code generation, no SDKs.
-
-## Create a manifest
-
-```yaml
-# manifest.yaml
-slug: my-api
-name: My API
-type: api
-spec: https://example.com/openapi.json
-url: https://api.example.com
-auth:
-  env: MY_API_KEY
-  type: bearer
-headers:
-  X-Custom: value
-```
-
-## Register
-
-```bash
-godmode extension add ./my-extension
-godmode my-api --help
-godmode mcp my-api
-```
-
-## Types
-
-### REST
-
-```yaml
-type: api
-spec: https://example.com/openapi.json
-url: https://api.example.com
-```
-
-### GraphQL
-
-```yaml
-type: graphql
-url: https://api.example.com/graphql
-```
-
-Or with a local SDL file:
-
-```yaml
-type: graphql
-spec: https://example.com/schema.graphql
-url: https://api.example.com/graphql
-```
-
-### MCP
-
-```yaml
-type: mcp
-url: https://my-mcp-server.com/mcp
-```
+- **Authoring** — write and test a manifest locally, then publish as `@godmode-cli/<name>`.
+- **Reference** — manifest schema, interface types, auth types.
+- **Advanced** — custom help classes, MCP derivative serving, multi-interface extensions.
+- **Contributing** — work on the CLI itself.

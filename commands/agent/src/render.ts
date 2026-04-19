@@ -1,5 +1,6 @@
 import { closeSync, existsSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { HelpPage } from 'godmode/help';
 import { latestTurn, runPath, timestamp, turnDir } from './store.js';
 import { normalizeTurn } from './harnesses.js';
 import type { NormalizedEvent, OutputMode, RunRecord, TurnRecord } from './types.js';
@@ -36,26 +37,46 @@ export function attachHelp() {
   ].join('\n');
 }
 
+export class AgentHelp extends HelpPage {
+  usage() {
+    return [
+      'godmode agent start [--harness <name>] [--model <id>] <prompt>',
+      'godmode agent send  [--harness <name>] [--model <id>] <prompt>',
+      'godmode agent attach run <id>',
+      'godmode agent attach session <session-id>',
+      'godmode agent output [id] [--json|--assistant-text|--events|--raw]',
+      'godmode agent status [id]',
+      'godmode agent list',
+    ];
+  }
+  sections() {
+    return [
+      { title: 'Options:', rows: [
+        ['    --harness <name>', 'coding agent harness (claude, codex, gemini, etc.)'],
+        ['    --model <id>', 'model identifier passed to the harness'],
+        ['    --effort <level>', 'effort level passed to the harness'],
+        ['    --json', 'output machine-readable events'],
+        ['    --follow', 'stream output until the run completes'],
+      ] as string[][] },
+      { title: 'Shortcuts:', rows: [
+        ['godmode agent <prompt>', 'send prompt to active run, or start a new run'],
+      ] as string[][] },
+    ];
+  }
+}
+
 export function agentHelp() {
-  return [
-    'Usage: godmode agent start [--harness <name>] [--model <id>] <prompt>',
-    '   or: godmode agent send  [--harness <name>] [--model <id>] <prompt>',
-    '   or: godmode agent attach run <id>',
-    '   or: godmode agent attach session <session-id>',
-    '   or: godmode agent output [id] [--json|--assistant-text|--events|--raw]',
-    '   or: godmode agent status [id]',
-    '   or: godmode agent list',
-    '',
-    'Options:',
-    '      --harness <name>    coding agent harness (claude, codex, gemini, etc.)',
-    '      --model <id>        model identifier passed to the harness',
-    '      --effort <level>    effort level passed to the harness',
-    '      --json              output machine-readable events',
-    '      --follow            stream output until the run completes',
-    '',
-    'Shortcuts:',
-    '  godmode agent <prompt>  send prompt to active run, or start a new run',
-  ].join('\n');
+  // Back-compat: returns the rendered string. Callers that do console.log(agentHelp())
+  // keep working while the new class-based API is adopted.
+  const lines: string[] = [];
+  const origLog = console.log;
+  console.log = (...args) => { lines.push(args.join(' ')); };
+  try {
+    new AgentHelp().render();
+  } finally {
+    console.log = origLog;
+  }
+  return lines.join('\n');
 }
 
 export function followOutput(run: RunRecord, turn: number, outputMode: OutputMode, writer: Pick<typeof process.stdout, 'write'>) {

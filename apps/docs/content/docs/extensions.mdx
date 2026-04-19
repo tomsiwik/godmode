@@ -1,0 +1,26 @@
+---
+title: Extensions
+description: Install, inspect, and manage godmode extensions.
+---
+
+## Manage
+
+<InstallCommand commands={[
+  { label: 'install', cmd: 'godmode ext install [name]' },
+  { label: 'uninstall', cmd: 'godmode ext uninstall [name]' },
+  { label: 'update', cmd: 'godmode ext update [name]' },
+  { label: 'list', cmd: 'godmode ext list' },
+]} />
+
+## Sources
+
+| Source | Example |
+|---|---|
+| Built-in name | `godmode ext install stripe` |
+| Npm package | `godmode ext install @acme/my-ext` |
+| Local folder | `godmode ext install ./my-extension` |
+| Manifest file | `godmode ext install ./my-extension/manifest.yaml` |
+
+A bare name resolves to `@godmode-cli/[name]` on npm. Scoped packages install as-is.
+
+Each extension declares its own auth. Run `godmode [name] --help` to see which env var to set.

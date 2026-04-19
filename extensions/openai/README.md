@@ -5,7 +5,7 @@ OpenAI extension for [Godmode](https://godmode.so).
 ## Install
 
 ```sh
-godmode extension add openai
+godmode ext install openai
 ```
 
 ## Environment
@@ -21,7 +21,7 @@ export OPENAI_API_KEY=sk-...
   "mcpServers": {
     "openai": {
       "command": "godmode",
-      "args": ["mcp", "openai"]
+      "args": ["openai", "mcp"]
     }
   }
 }

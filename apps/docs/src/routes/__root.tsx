@@ -32,7 +32,9 @@ function RootComponent() {
       <head>
         <HeadContent />
       </head>
-      <body className="flex flex-col min-h-screen">
+      {/* Grammarly and similar extensions inject attributes on <body> before
+          hydration; suppress to avoid noise in users' consoles. */}
+      <body className="flex flex-col min-h-screen" suppressHydrationWarning>
         <RootProvider search={{ SearchDialog }}>
           <Outlet />
         </RootProvider>

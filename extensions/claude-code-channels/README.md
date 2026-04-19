@@ -5,7 +5,7 @@ Inter-session messaging for Claude Code instances via [Godmode](https://godmode.
 ## Install
 
 ```sh
-godmode extension add claude-code-channels
+godmode ext install claude-code-channels
 ```
 
 ## Claude Code
@@ -15,7 +15,7 @@ godmode extension add claude-code-channels
   "mcpServers": {
     "channels": {
       "command": "godmode",
-      "args": ["mcp", "claude-code-channels"]
+      "args": ["claude-code-channels", "mcp"]
     }
   }
 }

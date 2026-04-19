@@ -1,23 +1,6 @@
 ---
-title: Testing Extensions
-description: Test your extensions with @godmode-cli/test
+title: Testing
+description: The compliance pipeline and parametrized test matrix.
 ---
 
-## Install
-
-```bash
-npm install -D @godmode-cli/test
-```
-
-## Usage
-
-```ts
-import { testExtension } from '@godmode-cli/test';
-testExtension('my-api', 'path/to/manifest.yaml');
-```
-
-This will:
-
-1. Register the extension via `godmode extension add`
-2. Test every route resolves to the correct URL using `--dry-run`
-3. Verify `--help` output shows usage and resources
+> TODO: `pnpm -r test` runs everything. The 200+ CLI tests cover rule × help-target combinations. How to add a new rule (edit `help-rules.ts`, it auto-applies to every target). The GNU help compliance pipeline (`help2man → mandoc -Tlint → groff -ww`) and how to run it locally.

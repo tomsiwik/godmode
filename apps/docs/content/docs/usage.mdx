@@ -1,0 +1,58 @@
+---
+title: Usage
+description: Invoke any extension through a single predictable shape.
+---
+
+## Grammar
+
+```sh
+godmode [extension] [interface]
+```
+
+That's the predictable part. Anything after `[interface]` is interface-specific.
+
+## A full example
+
+Using the [petstore](https://petstore3.swagger.io) extension — no auth, open API, good for poking around:
+
+```sh
+godmode ext install petstore                                    # install
+godmode petstore api --help                                     # list resources
+godmode petstore api GET pet 10                                 # fetch a pet by id
+godmode petstore api POST pet name=fido status=available        # create (key=value → body, key==value → query)
+godmode petstore api DELETE pet 10                              # delete
+```
+
+## Methods
+
+For `api` interfaces the HTTP method is the first positional after the interface — required, case-insensitive. Semantics follow the [standard REST verbs](https://restfulapi.net/http-methods/).
+
+<Callout type="info">
+  `graphql` and `mcp` don't take a method — a GraphQL call is always a query or mutation, and MCP dispatches by tool name.
+</Callout>
+
+## httpie-compatible arguments
+
+Arguments after the resource follow [httpie](https://httpie.io/docs/cli/request-items) conventions, so if you already know httpie the shape is familiar:
+
+| Syntax | Becomes |
+|---|---|
+| `key=value` | JSON body field |
+| `key==value` | Query parameter |
+| `Header:value` via `-H` | Request header |
+
+```sh
+godmode petstore api GET  pet status==available       # ?status=available
+godmode petstore api POST pet name=fido age=3         # {"name":"fido","age":"3"}
+godmode petstore api GET  pet -H 'X-Trace-Id:abc'     # adds header
+```
+
+## Discovery
+
+Every level accepts `--help`:
+
+```sh
+godmode petstore --help          # extension overview
+godmode petstore api --help      # interface + resource list
+godmode petstore api pet --help  # operations on pet
+```

@@ -24,7 +24,7 @@
     "clsx": "^2.1.1",
     "dither-plugin": "^1.1.1",
     "dotted-map": "^3.1.0",
-    "lucide-react": "^0.577.0",
+    "lucide-react": "^1.8.0",
     "motion": "^12.38.0",
     "radix-ui": "^1.4.3",
     "shadcn": "^4.1.0",

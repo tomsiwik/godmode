@@ -28,9 +28,18 @@ npm install -g godmode
 ## Usage
 
 ```sh
-godmode extension add stripe
-godmode api stripe customers cus_123
-godmode mcp stripe
+godmode ext install stripe
+godmode stripe api customers cus_123
+godmode stripe mcp                       # serve as MCP server
+```
+
+Everything is self-describing via `--help` at any nesting level:
+
+```sh
+godmode --help                           # interfaces + built-in extensions
+godmode <extension> --help               # declared interfaces
+godmode <extension> <interface> --help   # methods, resources, options
+godmode <extension> <interface> <resource> --help
 ```
 
 ## Claude Code
@@ -40,7 +49,7 @@ godmode mcp stripe
   "mcpServers": {
     "stripe": {
       "command": "godmode",
-      "args": ["mcp", "stripe"]
+      "args": ["stripe", "mcp"]
     }
   }
 }
@@ -58,40 +67,12 @@ interfaces:
     url: https://api.example.com
 auth:
   env: MY_API_KEY
-  type: bearer                         # bearer | api-key | basic (default: bearer)
+  type: bearer          # bearer | api-key | basic
 ```
 
 ```sh
 godmode ext install ./my-extension
+godmode my-extension api --help
 ```
 
-### Authentication types
-
-Godmode supports three credential conventions. The `type` field decides **where on the wire** the value from `auth.env` is sent:
-
-| `type`    | HTTP header                         | curl equivalent                                 | when to use |
-|-----------|-------------------------------------|-------------------------------------------------|-------------|
-| `bearer`  | `Authorization: Bearer <token>`     | `curl -H "Authorization: Bearer $TOKEN"`        | OAuth 2.0–style APIs (Stripe, GitHub, OpenAI, Slack) |
-| `api-key` | `<header>: <token>`                 | `curl -H "X-API-Key: $KEY"`                     | custom-header schemes; set `auth.header` to the header name (defaults to `X-API-Key`) |
-| `basic`   | `Authorization: Basic <credential>` | `curl -u user:password`                         | legacy APIs; the env var should hold base64-encoded `user:password` |
-
-Examples:
-
-```yaml
-# Bearer (default)
-auth:
-  env: STRIPE_API_KEY
-
-# API key in a custom header
-auth:
-  env: SENDGRID_API_KEY
-  type: api-key
-  header: X-API-Key
-
-# Basic auth
-auth:
-  env: WP_CREDS                        # raw value: base64("user:password")
-  type: basic
-```
-
-Running `godmode <extension> <interface> --help` shows `--> <ENV>: missing <type> …` at the top when the credential isn't set, with the wording matching the declared type.
+`auth.type` picks where on the wire the credential goes: `bearer` → `Authorization: Bearer <env>`, `api-key` → custom header (`auth.header`, defaults to `X-API-Key`), `basic` → `Authorization: Basic <env>` (env holds `base64(user:password)`). When the credential is missing, `--help` surfaces `--> <ENV>: missing <type>` at the top of the page with wording matching the declared type.

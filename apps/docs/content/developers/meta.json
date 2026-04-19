@@ -1,5 +1,23 @@
 {
   "title": "Developers",
   "root": true,
-  "pages": ["index", "testing", "---Example Extensions---", "example-extensions"]
+  "pages": [
+    "index",
+    "---Authoring---",
+    "quickstart",
+    "local-development",
+    "publishing",
+    "---Reference---",
+    "manifest-schema",
+    "interface-types",
+    "auth-types",
+    "---Advanced---",
+    "custom-help",
+    "mcp-serving",
+    "multi-interface",
+    "---Contributing---",
+    "setup",
+    "testing",
+    "pr-workflow"
+  ]
 }

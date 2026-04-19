@@ -1,24 +1,18 @@
 ---
 title: Extensions
-description: Built-in extensions
+description: Installable extensions grouped by interface type.
 ---
 
-## Overview
+Install any of these with `godmode ext install <slug>`, then invoke with `godmode <slug> <interface> ...`. Each page covers auth setup, live invocation examples, and the MCP config snippet.
 
-Godmode ships with extensions for popular APIs. Each extension is an npm package under `@godmode-cli/*`.
+| Extension | Interface | Slug |
+|-----------|-----------|------|
+| [Stripe](./stripe) | REST | `stripe` |
+| [OpenAI](./openai) | REST | `openai` |
+| [Slack](./slack) | REST | `slack` |
+| [Petstore](./petstore) | REST | `petstore` |
+| [GitHub](./github) | GraphQL | `github` |
+| [Context7](./context7) | MCP | `context7` |
+| [Claude Code Channels](./claude-code-channels) | MCP | `claude-code-channels` |
 
-```bash
-godmode extension add stripe
-godmode extension add github
-```
-
-## Available Extensions
-
-| Extension | Type |
-|---------|------|
-| [Stripe](/extensions/stripe) | REST |
-| [OpenAI](/extensions/openai) | REST |
-| [Slack](/extensions/slack) | REST |
-| [GitHub](/extensions/github) | GraphQL |
-| [Context7](/extensions/context7) | MCP |
-| [Claude Code Channels](/extensions/claude-code-channels) | MCP |
+To contribute your own, see [Submit an extension](./submit) and the [Developers → Authoring](/developers) section.

@@ -1,0 +1,24 @@
+---
+title: Installation
+description: Install the godmode CLI globally and confirm it runs.
+---
+
+## Install
+
+<InstallCommand />
+
+## Config directory
+
+| Path | Contents |
+|---|---|
+| `~/.godmode/extensions/` | One JSON file per registered extension — routes, tools, metadata. |
+| `~/.godmode/node_modules/` | Package-based extensions installed via `godmode ext install <npm-name>`. |
+
+On Linux, setting `$XDG_CONFIG_HOME` relocates `~/.godmode` to `$XDG_CONFIG_HOME/godmode`.
+
+## Uninstall
+
+```sh
+npm uninstall -g godmode
+rm -rf ~/.godmode      # optional — removes registered extensions
+```

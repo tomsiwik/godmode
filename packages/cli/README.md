@@ -11,10 +11,12 @@ npm install -g godmode
 ## Usage
 
 ```sh
-godmode extension add stripe
-godmode api stripe customers cus_123
-godmode mcp stripe
+godmode ext install stripe
+godmode stripe api customers cus_123
+godmode stripe mcp                # serve as MCP server
 ```
+
+Run `godmode --help` or `godmode <extension> --help` at any nesting level for usage.
 
 ## Claude Code
 
@@ -23,7 +25,7 @@ godmode mcp stripe
   "mcpServers": {
     "stripe": {
       "command": "godmode",
-      "args": ["mcp", "stripe"]
+      "args": ["stripe", "mcp"]
     }
   }
 }

@@ -5,7 +5,7 @@ Context7 extension for [Godmode](https://godmode.so).
 ## Install
 
 ```sh
-godmode extension add context7
+godmode ext install context7
 ```
 
 ## Environment
@@ -21,7 +21,7 @@ export CONTEXT7_API_KEY=...
   "mcpServers": {
     "context7": {
       "command": "godmode",
-      "args": ["mcp", "context7"]
+      "args": ["context7", "mcp"]
     }
   }
 }
