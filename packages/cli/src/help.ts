@@ -1,5 +1,27 @@
 import fuzzysort from 'fuzzysort';
+import {
+  authMissingLabel,
+  DIM,
+  GREEN,
+  HelpPage,
+  HelpSection,
+  ITALIC,
+  printTable,
+  renderSections,
+  RED,
+  RESET,
+  USE_COLOR,
+  visibleLength,
+  wrapText,
+  type AuthNote,
+  type Footer,
+  type HelpPageData,
+} from '@godmode-cli/cli';
 import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
+
+// Re-exports so consumers that imported these from 'godmode/help' keep working.
+export { HelpPage, renderSections, printTable, USE_COLOR, RESET, RED, DIM, ITALIC, GREEN, visibleLength, wrapText, authMissingLabel };
+export type { HelpSection, AuthNote, Footer, HelpPageData };
 
 // ── trie ────────────────────────────────────────────────────
 
@@ -69,7 +91,6 @@ function getChildren(node: TrieNode): TrieNode[] {
 
 const ACTION_ORDER = ['list', 'create', 'get', 'update', 'delete'];
 
-const USE_COLOR = process.stdout.isTTY;
 const METHOD_LABEL: Record<string, string> = USE_COLOR
   ? {
       get:    '\x1b[1;38;5;34mGET\x1b[0m',
@@ -79,11 +100,6 @@ const METHOD_LABEL: Record<string, string> = USE_COLOR
       delete: '\x1b[1;38;5;160mDELETE\x1b[0m',
     }
   : { get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', delete: 'DELETE' };
-const DIM = USE_COLOR ? '\x1b[2m' : '';
-const ITALIC = USE_COLOR ? '\x1b[3m' : '';
-const RESET = USE_COLOR ? '\x1b[0m' : '';
-const GREEN = USE_COLOR ? '\x1b[32m' : '';
-const RED = USE_COLOR ? '\x1b[31m' : '';
 
 const INTERFACE_LABEL: Record<string, string> = {
   api: 'API',
@@ -113,123 +129,6 @@ export const INTERFACE_OPTION_ROWS: Array<[string, string]> = [
   ['-h, --help', 'show help for this subcommand'],
   ['-v, --version', 'show extension spec versions'],
 ];
-
-// ── shared table helper ───────────────────────────────────────
-// Renders rows with column alignment. Cells may contain ANSI escapes;
-// visible width is measured with those stripped.
-function visibleLength(s: string): number {
-  return s.replace(/\x1b\[[0-9;]*m/g, '').length;
-}
-
-export interface HelpSection {
-  title: string;
-  /** Rows as string[][]. All columns except the last are treated as "left".
-   *  Last column is the description (flexible, wraps). Empty arrays render no header. */
-  rows: string[][];
-}
-
-/**
- * Render multiple sections with flexbox-like alignment:
- *   - Within each section, non-last columns align locally.
- *   - Across all sections, the boundary between left-blob and description
- *     is at the same column (global max).
- *   - The description column auto-wraps to respect maxLineWidth.
- */
-export function renderSections(sections: HelpSection[], maxLineWidth = 80) {
-  const INDENT = '  ';
-  const GAP = '  ';
-
-  // Flatten each section into [leftBlob, desc] pairs using per-section
-  // internal widths for non-last cols.
-  const flattened = sections.map((s) => {
-    if (!s.rows.length) return { title: s.title, rows: [] as Array<[string, string]> };
-    const cols = Math.max(...s.rows.map((r) => r.length));
-    const widths = Array<number>(cols).fill(0);
-    for (const row of s.rows) {
-      for (let i = 0; i < cols; i++) {
-        widths[i] = Math.max(widths[i], visibleLength(row[i] ?? ''));
-      }
-    }
-    const rows: Array<[string, string]> = s.rows.map((row) => {
-      const left = row
-        .slice(0, cols - 1)
-        .map((cell, i) => (cell ?? '') + ' '.repeat(widths[i] - visibleLength(cell ?? '')))
-        .join(GAP)
-        .replace(/\s+$/, '');
-      const desc = row[cols - 1] ?? '';
-      return [left, desc];
-    });
-    return { title: s.title, rows };
-  });
-
-  // Global left-blob width — only rows that have a description contribute
-  // (rows without descriptions just render at their natural width and don't
-  // distort alignment for the rest).
-  const allRows = flattened.flatMap((s) => s.rows);
-  if (!allRows.length) return;
-  const rowsWithDesc = allRows.filter((r) => r[1].length > 0);
-  const widthCandidates = (rowsWithDesc.length ? rowsWithDesc : allRows).map((r) => visibleLength(r[0]));
-  const globalLeft = Math.max(...widthCandidates);
-  const descBudget = Math.max(20, maxLineWidth - INDENT.length - globalLeft - GAP.length);
-
-  for (const s of flattened) {
-    if (!s.rows.length) continue;
-    if (s.title) {
-      console.log('');
-      console.log(s.title);
-    }
-    for (const [left, desc] of s.rows) {
-      const pad = ' '.repeat(Math.max(0, globalLeft - visibleLength(left)));
-      const plain = desc.replace(/\x1b\[[0-9;]*m/g, '');
-      if (!plain) {
-        console.log(`${INDENT}${left}${pad}`.trimEnd());
-        continue;
-      }
-      if (plain.length <= descBudget) {
-        console.log(`${INDENT}${left}${pad}${GAP}${desc}`);
-        continue;
-      }
-      const italic = /^\x1b\[3m/.test(desc);
-      const wrap = (s: string) => (italic ? `${ITALIC}${s}${RESET}` : s);
-      const lines = wrapText(plain, Math.max(10, descBudget));
-      console.log(`${INDENT}${left}${pad}${GAP}${wrap(lines[0])}`);
-      for (let i = 1; i < lines.length; i++) {
-        console.log(`${INDENT}${' '.repeat(Math.max(0, globalLeft))}${GAP}${wrap(lines[i])}`);
-      }
-    }
-  }
-}
-
-/** Back-compat single-table wrapper. */
-export function printTable(rows: string[][], opts: { maxLineWidth?: number } = {}) {
-  renderSections([{ title: '', rows }], opts.maxLineWidth);
-}
-
-function authMissingLabel(type?: string): string {
-  switch (type) {
-    case 'api-key': return 'missing api-key';
-    case 'basic':   return 'missing basic auth credentials';
-    case 'bearer':
-    default:        return 'missing bearer token';
-  }
-}
-
-function wrapText(text: string, width: number): string[] {
-  if (text.length <= width) return [text];
-  const out: string[] = [];
-  let line = '';
-  for (const word of text.split(/\s+/)) {
-    if (!line) { line = word; continue; }
-    if (line.length + 1 + word.length <= width) {
-      line += ' ' + word;
-    } else {
-      out.push(line);
-      line = word;
-    }
-  }
-  if (line) out.push(line);
-  return out;
-}
 
 function methodToAction(method: string, isResource: boolean): string {
   switch (method) {
@@ -263,94 +162,6 @@ function methodLabels(node: TrieNode): string {
   if (paramChild) for (const ep of paramChild.methods) methods.add(ep.method);
   const order = ['get', 'post', 'put', 'patch', 'delete'];
   return order.filter((m) => methods.has(m)).map((m) => METHOD_LABEL[m]).join(' ');
-}
-
-// ── HelpPage class system ────────────────────────────────────
-
-export interface AuthNote {
-  env: string;
-  authType: 'bearer' | 'api-key' | 'basic';
-  present: boolean;
-}
-
-export interface Footer {
-  reportBugs?: string;
-  homepage?: string;
-  /** Free-form lines rendered before the report-bugs/homepage block. */
-  extras?: string[];
-}
-
-export interface HelpPageData {
-  title: string | null;
-  tagline: string | null;
-  authNote: AuthNote | null;
-  usage: string[];
-  sections: HelpSection[];
-  footer: Footer | null;
-}
-
-/**
- * Base help page. Subclasses override the hooks to declare what to show;
- * render() walks them in a consistent order. toJSON() returns the whole
- * page as structured data — useful for machine-readable export or tests.
- */
-export abstract class HelpPage {
-  title(): string | null { return null; }
-  tagline(): string | null { return null; }
-  authNote(): AuthNote | null { return null; }
-  usage(): string[] { return []; }
-  sections(): HelpSection[] { return []; }
-  footer(): Footer | null { return null; }
-
-  toJSON(): HelpPageData {
-    return {
-      title: this.title(),
-      tagline: this.tagline(),
-      authNote: this.authNote(),
-      usage: this.usage(),
-      sections: this.sections(),
-      footer: this.footer(),
-    };
-  }
-
-  render(): void {
-    const d = this.toJSON();
-    let wrote = false;
-    if (d.title) { console.log(d.title); wrote = true; }
-    if (d.tagline) {
-      if (wrote) console.log('');
-      console.log(d.tagline);
-      wrote = true;
-    }
-    if (d.authNote && !d.authNote.present) {
-      const arrow = USE_COLOR ? `${RED}-->${RESET}` : '-->';
-      const label = authMissingLabel(d.authNote.authType);
-      const body = USE_COLOR ? `${RED}${label}${RESET}` : label;
-      if (wrote) console.log('');
-      console.log(`${arrow} ${d.authNote.env}: ${body}`);
-      wrote = true;
-    }
-    if (d.usage.length) {
-      if (wrote) console.log('');
-      for (let i = 0; i < d.usage.length; i++) {
-        const prefix = i === 0 ? 'Usage:' : '   or:';
-        console.log(`${prefix} ${d.usage[i]}`);
-      }
-      wrote = true;
-    }
-    renderSections(d.sections);
-    if (d.footer) {
-      if (d.footer.extras?.length) {
-        console.log('');
-        for (const line of d.footer.extras) console.log(line);
-      }
-      if (d.footer.reportBugs || d.footer.homepage) {
-        console.log('');
-        if (d.footer.reportBugs) console.log(`Report bugs to <${d.footer.reportBugs}>.`);
-        if (d.footer.homepage) console.log(`Godmode home page: <${d.footer.homepage}>.`);
-      }
-    }
-  }
 }
 
 // ── concrete pages ──────────────────────────────────────────

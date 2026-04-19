@@ -2,10 +2,25 @@ import { createFileRoute } from '@tanstack/react-router';
 import { LandingHeader } from '@/components/layout/landing-header';
 import { InstallCommand } from '@/components/install-command';
 
+const TITLE = 'Godmode — the swiss army knife for coding agents';
+const DESCRIPTION = 'One predictable CLI for every API, MCP server, and local command you install.';
+const OG_IMAGE = '/og/docs/image.webp';
+
 export const Route = createFileRoute('/')({
   component: Home,
   head: () => ({
-    meta: [{ title: 'Godmode — the swiss army knife for coding agents' }],
+    meta: [
+      { title: TITLE },
+      { name: 'description', content: DESCRIPTION },
+      { property: 'og:title', content: TITLE },
+      { property: 'og:description', content: DESCRIPTION },
+      { property: 'og:image', content: OG_IMAGE },
+      { property: 'og:type', content: 'website' },
+      { name: 'twitter:card', content: 'summary_large_image' },
+      { name: 'twitter:title', content: TITLE },
+      { name: 'twitter:description', content: DESCRIPTION },
+      { name: 'twitter:image', content: OG_IMAGE },
+    ],
   }),
 });
 

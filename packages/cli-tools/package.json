@@ -1,0 +1,33 @@
+{
+  "name": "@godmode-cli/cli",
+  "version": "0.0.1",
+  "private": true,
+  "description": "Shared CLI primitives — HelpPage class, section rendering, auth labels.",
+  "type": "module",
+  "license": "MIT",
+  "author": "Tomas Sivicki",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/tomsiwik/godmode",
+    "directory": "packages/cli-tools"
+  },
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "files": [
+    "src",
+    "dist",
+    "LICENSE",
+    "README.md"
+  ],
+  "scripts": {
+    "build": "tsup src/index.ts --format esm --dts --clean",
+    "test": "vitest run --passWithNoTests"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.5.0",
+    "vitest": "^4.1.0"
+  }
+}

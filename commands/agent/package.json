@@ -34,7 +34,7 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "godmode": "workspace:*"
+    "@godmode-cli/cli": "workspace:*"
   },
   "devDependencies": {
     "@types/node": "^22.0.0",

@@ -14,3 +14,7 @@ export { default as Footer } from './components/footer';
 export { default as Header } from './components/header';
 export * from './components/logo';
 export * from './components/logo-cloud';
+
+// OG image templates (rendered by takumi on the server)
+export { default as DocumentationTemplate } from './components/takumi/documentation-template';
+export type { DocumentationTemplateProps } from './components/takumi/documentation-template';

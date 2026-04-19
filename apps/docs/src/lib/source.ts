@@ -15,3 +15,11 @@ export async function getLLMText(page: InferPageType<typeof source>) {
 
 ${processed}`;
 }
+
+export function getPageImage(slugs: string[]) {
+  const segments = [...slugs, 'image.webp'];
+  return {
+    segments,
+    url: '/og/' + segments.join('/'),
+  };
+}

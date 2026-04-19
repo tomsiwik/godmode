@@ -40,6 +40,7 @@
     "test": "vitest run"
   },
   "dependencies": {
+    "@godmode-cli/cli": "workspace:*",
     "@godmode-cli/command-agent": "workspace:*",
     "@godmode-cli/interface-api": "workspace:*",
     "@godmode-cli/interface-graphql": "workspace:*",

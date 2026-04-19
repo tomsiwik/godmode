@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DocsLayout } from '@/components/layout/notebook';
 import { createServerFn } from '@tanstack/react-start';
-import { source } from '@/lib/source';
+import { getPageImage, source } from '@/lib/source';
 import browserCollections from 'collections/browser';
 import {
   DocsBody,
@@ -22,6 +22,24 @@ export const Route = createFileRoute('/$')({
     await clientLoader.preload(data.path);
     return data;
   },
+  head: ({ loaderData }) => {
+    if (!loaderData) return {};
+    const { title, description, ogImage } = loaderData;
+    return {
+      meta: [
+        { title },
+        { name: 'description', content: description },
+        { property: 'og:title', content: title },
+        { property: 'og:description', content: description },
+        { property: 'og:image', content: ogImage },
+        { property: 'og:type', content: 'article' },
+        { name: 'twitter:card', content: 'summary_large_image' },
+        { name: 'twitter:title', content: title },
+        { name: 'twitter:description', content: description },
+        { name: 'twitter:image', content: ogImage },
+      ],
+    };
+  },
 });
 
 const loader = createServerFn({
@@ -35,6 +53,9 @@ const loader = createServerFn({
     return {
       slugs: page.slugs,
       path: page.path,
+      title: page.data.title,
+      description: page.data.description,
+      ogImage: getPageImage(page.slugs).url,
       pageTree: await source.serializePageTree(source.getPageTree()),
     };
   });

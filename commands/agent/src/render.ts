@@ -1,6 +1,6 @@
 import { closeSync, existsSync, openSync, readFileSync, readSync, statSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { HelpPage } from 'godmode/help';
+import { HelpPage } from '@godmode-cli/cli';
 import { latestTurn, runPath, timestamp, turnDir } from './store.js';
 import { normalizeTurn } from './harnesses.js';
 import type { NormalizedEvent, OutputMode, RunRecord, TurnRecord } from './types.js';
