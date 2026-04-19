@@ -17,5 +17,11 @@
     "prettier": "^3.7.0",
     "turbo": "^2.7.0"
   },
-  "packageManager": "pnpm@10.33.0"
+  "packageManager": "pnpm@10.33.0",
+  "pnpm": {
+    "supportedArchitectures": {
+      "os": ["linux", "darwin"],
+      "cpu": ["x64", "arm64"]
+    }
+  }
 }
