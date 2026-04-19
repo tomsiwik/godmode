@@ -3,7 +3,7 @@
 </p>
 
 <p align="center">
-  Agent sandboxed? Give it this tool only `Bash(godmode:*)` for save plug & play extensions
+  Your agent's Swiss Army knife for the terminal.
 </p>
 
 <p align="center">
@@ -19,60 +19,21 @@
 
 Imagine your coding agent gets dropped on a desert island and is allowed to bring one thing. What would it pick? A Swiss Army knife, obviously. The terminal is that island — sometimes it's a bare, lonely sandbox with nothing on it, sometimes it's a rich setup like a Mac Studio with everything you could want. But as long as the agent has a knife it can pull any tool out of, it'll be fine. That knife is godmode.
 
-## Install
+## What it does
+
+godmode is a CLI with one invocation grammar for everything you install — APIs, MCP servers, local commands. Each of those is an extension, and they all take the same shape:
+
+```sh
+godmode [extension] [interface] [args]
+```
+
+Because every call goes through godmode, extensions can scope what's reachable: a stripe extension can hide account edits, a filesystem extension can restrict paths, a database extension can forbid writes. The sandbox is inherent to the abstraction, not a feature layered on top. For a sandboxed agent, that means one permission — `Bash(godmode:*)` — unlocks the entire toolbelt.
 
 ```sh
 npm install -g godmode
-```
-
-## Usage
-
-```sh
 godmode ext install stripe
-godmode stripe api customers cus_123
-godmode stripe mcp                       # serve as MCP server
+godmode stripe api GET customers cus_123
+godmode stripe mcp                          # serve over MCP
 ```
 
-Everything is self-describing via `--help` at any nesting level:
-
-```sh
-godmode --help                           # interfaces + built-in extensions
-godmode <extension> --help               # declared interfaces
-godmode <extension> <interface> --help   # methods, resources, options
-godmode <extension> <interface> <resource> --help
-```
-
-## Claude Code
-
-```json
-{
-  "mcpServers": {
-    "stripe": {
-      "command": "godmode",
-      "args": ["stripe", "mcp"]
-    }
-  }
-}
-```
-
-## Custom Extensions
-
-```yaml
-# manifest.yaml
-name: My Extension
-slug: my-extension
-interfaces:
-  api:
-    spec: https://example.com/openapi.json
-    url: https://api.example.com
-auth:
-  env: MY_API_KEY
-  type: bearer          # bearer | api-key | basic
-```
-
-```sh
-godmode ext install ./my-extension
-godmode my-extension api --help
-```
-
-`auth.type` picks where on the wire the credential goes: `bearer` → `Authorization: Bearer <env>`, `api-key` → custom header (`auth.header`, defaults to `X-API-Key`), `basic` → `Authorization: Basic <env>` (env holds `base64(user:password)`). When the credential is missing, `--help` surfaces `--> <ENV>: missing <type>` at the top of the page with wording matching the declared type.
+See the [docs](https://docs.godmode.so) for installation, the full grammar, authentication, and integrations.
