@@ -36,4 +36,4 @@ godmode stripe api GET customers cus_123
 godmode stripe mcp                          # serve over MCP
 ```
 
-See the [docs](https://docs.godmode.so) for installation, the full grammar, authentication, and integrations.
+See the [docs](https://godmode.so) for installation, the full grammar, authentication, and integrations.
