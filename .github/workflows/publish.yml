@@ -19,14 +19,13 @@ jobs:
 
       - uses: pnpm/action-setup@v4
 
+      # Node 24 ships npm >= 11.5.1 which is required for Trusted
+      # Publishing (OIDC) to npm. Bumping from 22 avoids the npm
+      # self-upgrade MODULE_NOT_FOUND bug on older runners.
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 24
           registry-url: https://registry.npmjs.org
-
-      # Trusted Publishing (OIDC) to npm requires npm >= 11.5.1.
-      # Node 22's bundled npm is 10.x, so upgrade explicitly.
-      - run: npm install -g npm@latest
 
       - run: pnpm install --frozen-lockfile
 

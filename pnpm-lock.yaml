@@ -83,6 +83,9 @@ importers:
       tailwind-merge:
         specifier: ^3.5.0
         version: 3.5.0
+      takumi-js:
+        specifier: ^1.0.14
+        version: 1.0.14(react-dom@19.2.5(react@19.2.5))(react@19.2.5)
       tslib:
         specifier: ^2.8.1
         version: 2.8.1
@@ -9398,7 +9401,7 @@ snapshots:
       '@tanstack/router-core': 1.168.15
       '@tanstack/start-client-core': 1.167.17
       '@tanstack/start-storage-context': 1.166.29
-      h3-v2: h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15))
+      h3-v2: h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.12))
       seroval: 1.5.2
     transitivePeerDependencies:
       - crossws
@@ -10689,7 +10692,7 @@ snapshots:
     optionalDependencies:
       crossws: 0.4.4(srvx@0.11.12)
 
-  h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15)):
+  h3@2.0.1-rc.20(crossws@0.4.5(srvx@0.11.12)):
     dependencies:
       rou3: 0.8.1
       srvx: 0.11.15
@@ -11735,7 +11738,7 @@ snapshots:
       crossws: 0.4.5(srvx@0.11.15)
       db0: 0.3.4
       env-runner: 0.1.7
-      h3: 2.0.1-rc.20(crossws@0.4.5(srvx@0.11.15))
+      h3: 2.0.1-rc.20(crossws@0.4.5(srvx@0.11.12))
       hookable: 6.1.1
       nf3: 0.3.16
       ocache: 0.1.4

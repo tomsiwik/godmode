@@ -1,5 +1,5 @@
 import { createFileRoute, notFound } from '@tanstack/react-router';
-import { ImageResponse } from '@takumi-rs/image-response';
+import ImageResponse from 'takumi-js/response';
 import { DocumentationTemplate } from '@godmode-cli/ui';
 import { source } from '@/lib/source';
 
