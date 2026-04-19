@@ -24,6 +24,10 @@ jobs:
           node-version: 22
           registry-url: https://registry.npmjs.org
 
+      # Trusted Publishing (OIDC) to npm requires npm >= 11.5.1.
+      # Node 22's bundled npm is 10.x, so upgrade explicitly.
+      - run: npm install -g npm@latest
+
       - run: pnpm install --frozen-lockfile
 
       - name: Create release PR or publish
