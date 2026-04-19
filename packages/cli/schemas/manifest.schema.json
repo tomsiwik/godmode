@@ -1,0 +1,130 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://godmode.so/schemas/manifest.schema.json",
+  "title": "Godmode Extension Manifest",
+  "description": "Declarative manifest for a godmode extension. Describes one or more interfaces (api / graphql / mcp) through which agents can invoke external systems.",
+  "type": "object",
+  "required": ["name", "interfaces"],
+  "additionalProperties": false,
+  "properties": {
+    "name": {
+      "type": "string",
+      "description": "Human-readable extension name.",
+      "minLength": 1
+    },
+    "slug": {
+      "type": "string",
+      "description": "URL-safe identifier used as the CLI argument (e.g. 'stripe' in `godmode api stripe`). Defaults to `name` lowercased.",
+      "pattern": "^[a-z0-9][a-z0-9-]*$"
+    },
+    "description": {
+      "type": "string",
+      "description": "One-line summary of what the extension provides."
+    },
+    "interfaces": {
+      "type": "object",
+      "description": "Map of interface name → interface-specific configuration. At least one required.",
+      "minProperties": 1,
+      "additionalProperties": false,
+      "properties": {
+        "api": { "$ref": "#/$defs/ApiInterface" },
+        "graphql": { "$ref": "#/$defs/GraphqlInterface" },
+        "mcp": { "$ref": "#/$defs/McpInterface" }
+      }
+    },
+    "auth": { "$ref": "#/$defs/Auth" },
+    "headers": {
+      "type": "object",
+      "description": "Additional request headers sent with every invocation.",
+      "additionalProperties": { "type": "string" }
+    }
+  },
+  "$defs": {
+    "ApiInterface": {
+      "type": "object",
+      "description": "REST (OpenAPI) interface. Resources and routes are derived from the spec.",
+      "required": ["spec"],
+      "additionalProperties": false,
+      "properties": {
+        "spec": {
+          "type": "string",
+          "description": "Path or URL to an OpenAPI document (YAML or JSON)."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "Base URL. If omitted, inferred from spec.servers[0].url."
+        },
+        "prefix": {
+          "type": "string",
+          "description": "Override path prefix (e.g. '/v1')."
+        },
+        "versions": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/Version" }
+        }
+      }
+    },
+    "GraphqlInterface": {
+      "type": "object",
+      "description": "GraphQL interface. Requires either an SDL file (spec) or an introspectable endpoint (url).",
+      "additionalProperties": false,
+      "anyOf": [
+        { "required": ["spec"] },
+        { "required": ["url"] }
+      ],
+      "properties": {
+        "spec": {
+          "type": "string",
+          "description": "Path to a GraphQL SDL (.graphql) file."
+        },
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "GraphQL endpoint; introspected if spec is not provided."
+        }
+      }
+    },
+    "McpInterface": {
+      "type": "object",
+      "description": "Model Context Protocol server endpoint.",
+      "required": ["url"],
+      "additionalProperties": false,
+      "properties": {
+        "url": {
+          "type": "string",
+          "format": "uri",
+          "description": "MCP server endpoint URL."
+        }
+      }
+    },
+    "Auth": {
+      "type": "object",
+      "description": "Shared authentication config. Applies to every interface unless overridden.",
+      "additionalProperties": false,
+      "properties": {
+        "env": {
+          "type": "string",
+          "description": "Environment variable containing the credential."
+        },
+        "type": {
+          "enum": ["bearer", "api-key", "basic"],
+          "default": "bearer"
+        },
+        "header": {
+          "type": "string",
+          "description": "Header name for 'api-key' type (e.g. 'X-API-Key')."
+        }
+      }
+    },
+    "Version": {
+      "type": "object",
+      "required": ["prefix"],
+      "additionalProperties": false,
+      "properties": {
+        "prefix": { "type": "string" },
+        "name": { "type": "string" }
+      }
+    }
+  }
+}

@@ -1,9 +1,17 @@
 import { resolve } from 'node:path';
 import { readFile } from 'node:fs/promises';
 import { spawn } from 'node:child_process';
-import { GODMODE_HOME, loadManifest } from 'godmode/config';
+import type { Manifest } from 'godmode/spec';
 
-export async function runMcp(args: string[]) {
+// Dependencies injected by the caller to avoid cross-package module resolution
+// at runtime (see notes in README). The CLI package supplies these because
+// it owns GODMODE_HOME and the loader.
+export interface McpRuntime {
+  godmodeHome: string;
+  loadManifest: (name: string) => Promise<Manifest>;
+}
+
+export async function runMcp(rt: McpRuntime, args: string[]) {
   const name = args[0];
   if (!name || name === '--help' || name === '-h') {
     console.log(`Serve a registered API as an MCP server over stdio.
@@ -30,7 +38,7 @@ For spec-based extensions, serves routes as MCP tools.`);
 
   // Check for package-based extension with .mcp.json
   const pkgName = name.startsWith('@') ? name : `@godmode-cli/${name}`;
-  const pkgDir = resolve(GODMODE_HOME, 'node_modules', pkgName);
+  const pkgDir = resolve(rt.godmodeHome, 'node_modules', pkgName);
   const mcpConfigPath = resolve(pkgDir, '.mcp.json');
 
   try {
@@ -50,7 +58,7 @@ For spec-based extensions, serves routes as MCP tools.`);
   } catch {}
 
   // Fallback: generic MCP from manifest
-  const manifest = await loadManifest(name);
-  const { serveMcp } = await import('../mcp-server.js');
+  const manifest = await rt.loadManifest(name);
+  const { serveMcp } = await import('./server.js');
   await serveMcp(manifest, { filter, method });
 }

@@ -13,10 +13,18 @@ const METHOD_FLAG: Record<string, string[]> = {
 };
 
 export const gm = (...args: string[]) => {
+  // Test-only: --dry-run and --verbose are no longer CLI flags; they map
+  // to env vars internally. Strip them from args and set the env vars.
+  const env = { ...process.env };
+  const filtered = args.filter((a) => {
+    if (a === '--dry-run') { env.GODMODE_DRY_RUN = '1'; return false; }
+    if (a === '--verbose') { env.GODMODE_VERBOSE = '1'; return false; }
+    return true;
+  });
   try {
     return execSync(
-      `node dist/index.js ${args.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
-      { cwd: resolve(__dirname, '..'), encoding: 'utf-8', timeout: 10000 },
+      `node dist/index.js ${filtered.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
+      { cwd: resolve(__dirname, '..'), encoding: 'utf-8', timeout: 10000, env },
     ).trim();
   } catch (e: any) {
     return (e.stdout || '').trim();

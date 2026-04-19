@@ -5,7 +5,6 @@ interface RequestOptions {
   headers: Record<string, string>;
   query: Record<string, string>;
   body?: string;
-  token?: string;
   verbose?: boolean;
   dryRun?: boolean;
 }
@@ -30,12 +29,11 @@ export async function executeToString(manifest: Manifest, match: Match, options:
   // Build headers: config defaults → per-request overrides
   const headers: Record<string, string> = { ...manifest.config.headers, ...options.headers };
 
-  // Auth: --token flag > env var from config
   const authConfig = manifest.config.auth;
-  const token = options.token || (authConfig?.env ? process.env[authConfig.env] : undefined);
+  const token = authConfig?.env ? process.env[authConfig.env] : undefined;
 
   if (authConfig?.env && !token && !options.dryRun) {
-    throw new Error(`Missing ${authConfig.env}. Set it in .env or environment, or use --token.`);
+    throw new Error(`Missing ${authConfig.env}. Set it in .env or export it in your shell.`);
   }
 
   if (token) {

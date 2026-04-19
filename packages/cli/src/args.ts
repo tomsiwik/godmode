@@ -1,17 +1,21 @@
 export interface ParsedArgs {
   segments: string[];
   method: string;
+  /** True when the user set method explicitly (positional or -g/-po/-d/etc.). */
+  explicitMethod: boolean;
   headers: Record<string, string>;
   query: Record<string, string>;
   body: Record<string, string>;
-  token?: string;
   filter?: string;
   methodFilter?: string;
   all: boolean;
+  /** Sourced from env vars GODMODE_VERBOSE / GODMODE_DRY_RUN; no user-facing flags. */
   verbose: boolean;
   dryRun: boolean;
   help: boolean;
 }
+
+const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
 
 export function parseArgs(args: string[]): ParsedArgs {
   const segments: string[] = [];
@@ -19,24 +23,24 @@ export function parseArgs(args: string[]): ParsedArgs {
   const query: Record<string, string> = {};
   const body: Record<string, string> = {};
   let method = 'get';
-  let token: string | undefined;
+  let explicitMethod = false;
   let filter: string | undefined;
   let methodFilter: string | undefined;
   let all = false;
-  let verbose = false;
-  let dryRun = false;
+  const verbose = process.env.GODMODE_VERBOSE === '1';
+  const dryRun = process.env.GODMODE_DRY_RUN === '1';
   let help = false;
 
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
     switch (arg) {
       // HTTP methods
-      case '-g':  case '--get':    method = 'get';    break;
-      case '-po': case '--post':   method = 'post';   break;
-      case '-pu': case '--put':    method = 'put';    break;
-      case '-pa': case '--patch':  method = 'patch';  break;
-      case '-d':  case '--delete': method = 'delete'; break;
-      case '--head':               method = 'head';   break;
+      case '-g':  case '--get':    method = 'get';    explicitMethod = true; break;
+      case '-po': case '--post':   method = 'post';   explicitMethod = true; break;
+      case '-pu': case '--put':    method = 'put';    explicitMethod = true; break;
+      case '-pa': case '--patch':  method = 'patch';  explicitMethod = true; break;
+      case '-d':  case '--delete': method = 'delete'; explicitMethod = true; break;
+      case '--head':               method = 'head';   explicitMethod = true; break;
       // Options
       case '-H': case '--header': {
         const val = args[++i];
@@ -44,17 +48,24 @@ export function parseArgs(args: string[]): ParsedArgs {
         if (idx > 0) headers[val.slice(0, idx).trim()] = val.slice(idx + 1).trim();
         break;
       }
-      case '--token':              token = args[++i];  break;
-      case '--filter':             filter = args[++i];       break;
-      case '--method':             methodFilter = args[++i]; break;
-      case '--all':                all = true;               break;
-      case '-v': case '--verbose': verbose = true;    break;
-      case '--dry-run':            dryRun = true;     break;
+      case '-F': case '--filter':  filter = args[++i];        break;
+      case '-X': case '--method':  methodFilter = args[++i];  break;
+      case '-A': case '--all':     all = true;                break;
       case '-h': case '--help':    help = true;       break;
       default:
         if (arg.startsWith('-')) {
           process.stderr.write(`Unknown flag: ${arg}\n`);
           process.exit(1);
+        }
+        // Positional HTTP method, only at the leading position (right after
+        // the interface, e.g. `godmode stripe api GET account`).
+        // Case-insensitive — `GET`, `get`, `Get` all work. Collision with a
+        // lowercase resource named `get` is theoretical; real specs don't use
+        // HTTP-verb names as paths.
+        if (!segments.length && HTTP_METHODS.has(arg.toUpperCase())) {
+          method = arg.toLowerCase();
+          explicitMethod = true;
+          break;
         }
         // httpie-style: key==value -> query, key=value -> body
         const eqeq = arg.indexOf('==');
@@ -70,9 +81,9 @@ export function parseArgs(args: string[]): ParsedArgs {
   }
 
   // body fields imply POST if no method was explicitly set
-  if (Object.keys(body).length && method === 'get') method = 'post';
+  if (Object.keys(body).length && !explicitMethod) method = 'post';
 
-  return { segments, method, headers, query, body, token, filter, methodFilter, all, verbose, dryRun, help };
+  return { segments, method, explicitMethod, headers, query, body, filter, methodFilter, all, verbose, dryRun, help };
 }
 
 export async function readStdin(): Promise<string | undefined> {

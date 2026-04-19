@@ -30,22 +30,31 @@ function writeFileSyncSafe(path: string, content: string) {
 }
 
 export function attachHelp() {
-  return 'Usage:\n  godmode agent attach run <id>\n  godmode agent attach session <zmx-session-id>';
+  return [
+    'Usage: godmode agent attach run <id>',
+    '   or: godmode agent attach session <zmx-session-id>',
+  ].join('\n');
 }
 
 export function agentHelp() {
   return [
-    'Usage:',
-    '  godmode agent start [--harness <name>] [--model <id>] [--effort <level>] <prompt>',
-    '  godmode agent send  [--harness <name>] [--model <id>] [--effort <level>] <prompt>',
-    '  godmode agent attach run <id>',
-    '  godmode agent attach session <session-id>',
-    '  godmode agent output [id] [--json|--assistant-text|--events|--raw] [--follow]',
-    '  godmode agent status [id]',
-    '  godmode agent list',
+    'Usage: godmode agent start [--harness <name>] [--model <id>] <prompt>',
+    '   or: godmode agent send  [--harness <name>] [--model <id>] <prompt>',
+    '   or: godmode agent attach run <id>',
+    '   or: godmode agent attach session <session-id>',
+    '   or: godmode agent output [id] [--json|--assistant-text|--events|--raw]',
+    '   or: godmode agent status [id]',
+    '   or: godmode agent list',
+    '',
+    'Options:',
+    '      --harness <name>    coding agent harness (claude, codex, gemini, etc.)',
+    '      --model <id>        model identifier passed to the harness',
+    '      --effort <level>    effort level passed to the harness',
+    '      --json              output machine-readable events',
+    '      --follow            stream output until the run completes',
     '',
     'Shortcuts:',
-    '  godmode agent <prompt>    Send prompt to active run, or start a new run if none exists',
+    '  godmode agent <prompt>  send prompt to active run, or start a new run',
   ].join('\n');
 }
 

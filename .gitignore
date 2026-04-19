@@ -7,3 +7,12 @@ dist
 .source
 .tanstack
 .vercel
+
+# GNU help compliance scratch dirs
+.gmverify
+.help-compliance
+
+# Cloned linter sources kept locally for rule-catalog reference (utils/RULES.md)
+utils/mandoc
+utils/help2man
+utils/groff

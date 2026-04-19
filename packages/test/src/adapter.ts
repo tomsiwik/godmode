@@ -6,7 +6,18 @@ import { homedir } from 'node:os';
 
 interface Segment { value: string; isParam: boolean }
 interface Route { path: string; method: string; version: string; segments: Segment[] }
-interface Manifest { name: string; config: { url: string; type?: string }; routes: Route[]; versions: Array<{ name: string }> }
+interface InterfaceData {
+  type: 'api' | 'graphql' | 'mcp';
+  url?: string;
+  routes: Route[];
+  versions?: Array<{ name: string }>;
+}
+interface MultiManifest {
+  name: string;
+  slug: string;
+  interfaces: Record<'api' | 'graphql' | 'mcp', InterfaceData | undefined>;
+}
+interface FlatView { url: string; type: InterfaceData['type']; routes: Route[] }
 
 const METHOD_FLAG: Record<string, string[]> = {
   get: ['-g'], post: ['-po'], put: ['-pu'], patch: ['-pa'], delete: ['-d'], head: ['--head'],
@@ -23,27 +34,43 @@ function ensureCliBuilt() {
 
 export const gm = (...args: string[]) => {
   ensureCliBuilt();
+  const env = { ...process.env };
+  const filtered = args.filter((a) => {
+    if (a === '--dry-run') { env.GODMODE_DRY_RUN = '1'; return false; }
+    if (a === '--verbose') { env.GODMODE_VERBOSE = '1'; return false; }
+    return true;
+  });
   try {
     return execSync(
-      `node ${JSON.stringify(CLI_ENTRY)} ${args.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
-      { encoding: 'utf-8', timeout: 10000 },
+      `node ${JSON.stringify(CLI_ENTRY)} ${filtered.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
+      { encoding: 'utf-8', timeout: 10000, env },
     ).trim();
   } catch (e: any) {
     return (e.stdout || '').trim();
   }
 };
 
-function loadManifest(name: string): Manifest {
+function loadManifest(name: string): MultiManifest {
   const base = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
     ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
     : resolve(homedir(), '.godmode');
   return JSON.parse(readFileSync(resolve(base, 'apis', `${name}.json`), 'utf-8'));
 }
 
-function buildTestCases(name: string, manifest: Manifest) {
+function primaryInterface(multi: MultiManifest): FlatView {
+  const order: Array<'api' | 'graphql' | 'mcp'> = ['api', 'graphql', 'mcp'];
+  for (const k of order) {
+    const d = multi.interfaces[k];
+    if (d) return { url: d.url || '', type: d.type, routes: d.routes };
+  }
+  throw new Error(`No interfaces declared on ${multi.slug}`);
+}
+
+function buildTestCases(name: string, multi: MultiManifest) {
+  const view = primaryInterface(multi);
   const segKey = (r: Route) => `${r.method}:${r.segments.map((s) => (s.isParam ? '*' : s.value)).join('/')}`;
   const byKey = new Map<string, Route[]>();
-  for (const r of manifest.routes) {
+  for (const r of view.routes) {
     const k = segKey(r);
     (byKey.get(k) || (() => { const a: Route[] = []; byKey.set(k, a); return a; })()).push(r);
   }
@@ -58,7 +85,7 @@ function buildTestCases(name: string, manifest: Manifest) {
     }
   }
 
-  return manifest.routes
+  return view.routes
     .filter((r) => r.segments.length > 0)
     .filter((r) => !shadowed.has(`${r.method}:${r.path}`))
     .reduce<Array<{ label: string; args: string[]; expected: string }>>((acc, route) => {
@@ -72,10 +99,10 @@ function buildTestCases(name: string, manifest: Manifest) {
 
       acc.push({
         label: `${route.method.toUpperCase()} ${route.path}`,
-        args: ['api', name, ...segments, ...flags, '--dry-run'],
-        expected: manifest.config.type === 'mcp'
-          ? `CALL ${manifest.config.url} → ${route.path}`
-          : `${manifest.config.url}${expectedPath}`,
+        args: [name, view.type, ...segments, ...flags, '--dry-run'],
+        expected: view.type === 'mcp'
+          ? `CALL ${view.url} → ${route.path}`
+          : `${view.url}${expectedPath}`,
       });
       return acc;
     }, []);
@@ -86,9 +113,9 @@ export function testAdapter(name: string, configPath: string) {
     let cases: ReturnType<typeof buildTestCases>;
 
     beforeAll(() => {
-      const list = gm('extension', 'list');
+      const list = gm('setup', 'command', 'list');
       if (!list.includes(name)) {
-        const result = gm('extension', 'add', configPath);
+        const result = gm('setup', 'command', 'add', configPath);
         if (result.includes('Error') || result.includes('failed')) {
           throw new Error(`Failed to add ${name}: ${result}`);
         }
@@ -108,7 +135,8 @@ export function testAdapter(name: string, configPath: string) {
     });
 
     it('--help shows usage and resources', () => {
-      const out = gm('api', name, '--help');
+      const view = primaryInterface(loadManifest(name));
+      const out = gm(name, view.type, '--help');
       expect(out).toContain('Usage:');
       expect(out).toContain('Resources:');
     });

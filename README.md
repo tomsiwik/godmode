@@ -50,15 +50,48 @@ godmode mcp stripe
 
 ```yaml
 # manifest.yaml
-slug: my-extension
 name: My Extension
-type: api                              # api | graphql | mcp
-spec: https://example.com/openapi.json
-url: https://api.example.com
+slug: my-extension
+interfaces:
+  api:
+    spec: https://example.com/openapi.json
+    url: https://api.example.com
 auth:
   env: MY_API_KEY
+  type: bearer                         # bearer | api-key | basic (default: bearer)
 ```
 
 ```sh
-godmode extension add ./my-extension
+godmode ext install ./my-extension
 ```
+
+### Authentication types
+
+Godmode supports three credential conventions. The `type` field decides **where on the wire** the value from `auth.env` is sent:
+
+| `type`    | HTTP header                         | curl equivalent                                 | when to use |
+|-----------|-------------------------------------|-------------------------------------------------|-------------|
+| `bearer`  | `Authorization: Bearer <token>`     | `curl -H "Authorization: Bearer $TOKEN"`        | OAuth 2.0–style APIs (Stripe, GitHub, OpenAI, Slack) |
+| `api-key` | `<header>: <token>`                 | `curl -H "X-API-Key: $KEY"`                     | custom-header schemes; set `auth.header` to the header name (defaults to `X-API-Key`) |
+| `basic`   | `Authorization: Basic <credential>` | `curl -u user:password`                         | legacy APIs; the env var should hold base64-encoded `user:password` |
+
+Examples:
+
+```yaml
+# Bearer (default)
+auth:
+  env: STRIPE_API_KEY
+
+# API key in a custom header
+auth:
+  env: SENDGRID_API_KEY
+  type: api-key
+  header: X-API-Key
+
+# Basic auth
+auth:
+  env: WP_CREDS                        # raw value: base64("user:password")
+  type: basic
+```
+
+Running `godmode <extension> <interface> --help` shows `--> <ENV>: missing <type> …` at the top when the credential isn't set, with the wording matching the declared type.
