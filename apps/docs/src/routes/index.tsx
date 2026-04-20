@@ -5,7 +5,7 @@ import { SITE_URL } from '@/lib/source';
 
 const TITLE = 'Godmode — the swiss army knife for coding agents';
 const DESCRIPTION = 'One predictable CLI for every API, MCP server, and local command you install.';
-const OG_IMAGE = `${SITE_URL}/og/docs/image.webp`;
+const OG_IMAGE = `${SITE_URL}/og/landing.webp`;
 
 export const Route = createFileRoute('/')({
   component: Home,

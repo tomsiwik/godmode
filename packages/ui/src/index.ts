@@ -18,3 +18,5 @@ export * from './components/logo-cloud';
 // OG image templates (rendered by takumi on the server)
 export { default as DocumentationTemplate } from './components/takumi/documentation-template';
 export type { DocumentationTemplateProps } from './components/takumi/documentation-template';
+export { default as LandingTemplate } from './components/takumi/landing-template';
+export type { LandingTemplateProps } from './components/takumi/landing-template';

@@ -13,6 +13,7 @@ import { Route as LlmsDottxtRouteImport } from './routes/llms[.]txt'
 import { Route as LlmsFullDottxtRouteImport } from './routes/llms-full[.]txt'
 import { Route as SplatRouteImport } from './routes/$'
 import { Route as IndexRouteImport } from './routes/index'
+import { Route as OgLandingDotwebpRouteImport } from './routes/og/landing[.]webp'
 import { Route as OgSplatRouteImport } from './routes/og/$'
 import { Route as ApiSearchRouteImport } from './routes/api/search'
 import { Route as LlmsDotmdxDocsSplatRouteImport } from './routes/llms[.]mdx.docs.$'
@@ -35,6 +36,11 @@ const SplatRoute = SplatRouteImport.update({
 const IndexRoute = IndexRouteImport.update({
   id: '/',
   path: '/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const OgLandingDotwebpRoute = OgLandingDotwebpRouteImport.update({
+  id: '/og/landing.webp',
+  path: '/og/landing.webp',
   getParentRoute: () => rootRouteImport,
 } as any)
 const OgSplatRoute = OgSplatRouteImport.update({
@@ -60,6 +66,7 @@ export interface FileRoutesByFullPath {
   '/llms.txt': typeof LlmsDottxtRoute
   '/api/search': typeof ApiSearchRoute
   '/og/$': typeof OgSplatRoute
+  '/og/landing.webp': typeof OgLandingDotwebpRoute
   '/llms.mdx/docs/$': typeof LlmsDotmdxDocsSplatRoute
 }
 export interface FileRoutesByTo {
@@ -69,6 +76,7 @@ export interface FileRoutesByTo {
   '/llms.txt': typeof LlmsDottxtRoute
   '/api/search': typeof ApiSearchRoute
   '/og/$': typeof OgSplatRoute
+  '/og/landing.webp': typeof OgLandingDotwebpRoute
   '/llms.mdx/docs/$': typeof LlmsDotmdxDocsSplatRoute
 }
 export interface FileRoutesById {
@@ -79,6 +87,7 @@ export interface FileRoutesById {
   '/llms.txt': typeof LlmsDottxtRoute
   '/api/search': typeof ApiSearchRoute
   '/og/$': typeof OgSplatRoute
+  '/og/landing.webp': typeof OgLandingDotwebpRoute
   '/llms.mdx/docs/$': typeof LlmsDotmdxDocsSplatRoute
 }
 export interface FileRouteTypes {
@@ -90,6 +99,7 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/api/search'
     | '/og/$'
+    | '/og/landing.webp'
     | '/llms.mdx/docs/$'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -99,6 +109,7 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/api/search'
     | '/og/$'
+    | '/og/landing.webp'
     | '/llms.mdx/docs/$'
   id:
     | '__root__'
@@ -108,6 +119,7 @@ export interface FileRouteTypes {
     | '/llms.txt'
     | '/api/search'
     | '/og/$'
+    | '/og/landing.webp'
     | '/llms.mdx/docs/$'
   fileRoutesById: FileRoutesById
 }
@@ -118,6 +130,7 @@ export interface RootRouteChildren {
   LlmsDottxtRoute: typeof LlmsDottxtRoute
   ApiSearchRoute: typeof ApiSearchRoute
   OgSplatRoute: typeof OgSplatRoute
+  OgLandingDotwebpRoute: typeof OgLandingDotwebpRoute
   LlmsDotmdxDocsSplatRoute: typeof LlmsDotmdxDocsSplatRoute
 }
 
@@ -151,6 +164,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof IndexRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/og/landing.webp': {
+      id: '/og/landing.webp'
+      path: '/og/landing.webp'
+      fullPath: '/og/landing.webp'
+      preLoaderRoute: typeof OgLandingDotwebpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/og/$': {
       id: '/og/$'
       path: '/og/$'
@@ -182,6 +202,7 @@ const rootRouteChildren: RootRouteChildren = {
   LlmsDottxtRoute: LlmsDottxtRoute,
   ApiSearchRoute: ApiSearchRoute,
   OgSplatRoute: OgSplatRoute,
+  OgLandingDotwebpRoute: OgLandingDotwebpRoute,
   LlmsDotmdxDocsSplatRoute: LlmsDotmdxDocsSplatRoute,
 }
 export const routeTree = rootRouteImport
