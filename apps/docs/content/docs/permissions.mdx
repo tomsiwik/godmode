@@ -1,0 +1,117 @@
+---
+title: Permissions
+description: Scope what each extension can reach with a single YAML file.
+---
+
+Every call made through godmode can be scoped by a permissions policy. Agents already get sandboxed via the single `Bash(godmode:*)` permission — permissions let you narrow that further, per extension, down to the route or tool level.
+
+## Where they live
+
+```
+~/.godmode/settings.yaml           # global (base)
+<cwd>/.godmode/settings.yaml       # project (overlay)
+```
+
+Project settings **append** rules to the global list. Nothing is lost in a merge — global applies first, project rules apply on top. A matching `deny` anywhere wins, so project rules can always tighten but never silently loosen a global policy.
+
+## Shape
+
+```yaml
+extensions:
+  stripe:
+    permissions:
+      allow:
+        - resources: [customers.*, charges]
+          methods:   [GET, POST]
+      deny:
+        - resources: [account]   # legal flagged account writes
+```
+
+| Field       | In     | Notes |
+|---|---|---|
+| `resources` | rule   | Dotted resource patterns; `*` is a segment-aware glob. Defaults to `['*']`. Explicit empty list matches nothing (typo guard). |
+| `methods`   | rule   | HTTP methods (API) or tool verbs (MCP). Omit to match any. Case-insensitive. |
+
+Document exceptions with a YAML comment (`#`) next to the rule. The loader keeps the rule either way.
+
+## Evaluation
+
+1. **No `permissions` block** for an extension → everything is allowed (opt-in).
+2. **Block present** → default deny. An action must match at least one `allow` to be permitted.
+3. **A matching `deny`** always wins, regardless of `allow`.
+
+Adding permissions is backwards-compatible: extensions not mentioned in `settings.yaml` behave exactly as before. You only take on default-deny semantics where you've opted in.
+
+## Resource paths
+
+godmode derives a dotted resource name from a route's static segments. Version prefixes (`v1`, `v2`, …) and path parameters are stripped.
+
+| Route | Resource |
+|---|---|
+| `/v1/customers` | `customers` |
+| `/v1/customers/{customer}` | `customers` |
+| `/v1/customers/{customer}/balance_transactions` | `customers.balance_transactions` |
+| `/v1/billing/meter_events` | `billing.meter_events` |
+
+MCP tool names are used verbatim.
+
+## Glob patterns
+
+- `*` — matches anything
+- `customers` — exact match
+- `customers.*` — any sub-resource of `customers` (`customers.balance_transactions`, etc.) but not `customers` itself
+- `customers.*.balance_transactions` — one-segment wildcard; matches `customers.X.balance_transactions`
+
+## Examples
+
+**Read-only stripe:**
+
+```yaml
+extensions:
+  stripe:
+    permissions:
+      allow:
+        - methods: [GET, HEAD]
+```
+
+**Write anywhere except account:**
+
+```yaml
+extensions:
+  stripe:
+    permissions:
+      allow:
+        - resources: ['*']
+      deny:
+        - resources: [account]
+          methods:   [POST, PUT, PATCH, DELETE]
+```
+
+**Only customer operations:**
+
+```yaml
+extensions:
+  stripe:
+    permissions:
+      allow:
+        - resources: [customers, customers.*]
+```
+
+**Restrict an MCP extension to a single tool:**
+
+```yaml
+extensions:
+  context7:
+    permissions:
+      allow:
+        - resources: [search-docs]
+```
+
+## What blocked calls look like
+
+When a call is denied, godmode writes the reason to stderr and exits with a non-zero status *before* the request is dispatched — no headers are built, no network call is made.
+
+```
+$ godmode stripe api POST account email=x
+Blocked: denied by permissions for stripe: deny account [any method]...
+```

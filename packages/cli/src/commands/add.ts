@@ -1,6 +1,6 @@
-import { addApi } from '../config.js';
+import { addApi, type Scope } from '../config.js';
 
-export async function runAdd(args: string[]) {
+export async function runAdd(args: string[], scope: Scope = 'project') {
   if (!args[0] || args[0] === '--help' || args[0] === '-h') {
     console.log(`Add an extension from a folder, built-in name, or manifest.
 
@@ -34,5 +34,5 @@ Examples:
   $ godmode extension add openai`);
     process.exit(args[0] ? 0 : 1);
   }
-  await addApi(args[0]);
+  await addApi(args[0], scope);
 }

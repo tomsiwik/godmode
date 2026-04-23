@@ -1,4 +1,5 @@
 import type { ApiConfig, Manifest, Route } from 'godmode/spec';
+import { AuthStrategy } from '@godmode-cli/cli';
 
 // ── MCP JSON-RPC client ─────────────────────────────────────
 
@@ -85,9 +86,7 @@ function buildAuthHeaders(config: ApiConfig): Record<string, string> {
   const headers: Record<string, string> = { ...config.headers };
   const token = config.auth?.env ? process.env[config.auth.env] : undefined;
   if (token) {
-    const authType = config.auth?.type || 'bearer';
-    if (authType === 'bearer') headers['Authorization'] = `Bearer ${token}`;
-    else if (authType === 'api-key') headers[config.auth?.header || 'X-API-Key'] = token;
+    AuthStrategy.for(config.auth).apply(headers, token);
   }
   return headers;
 }
@@ -186,11 +185,11 @@ export async function executeMcpTool(
   config: ApiConfig,
   toolName: string,
   args: Record<string, string>,
-  options: { verbose?: boolean; dryRun?: boolean },
+  options: { debug?: boolean; dryRun?: boolean },
 ): Promise<string> {
   const headers = buildAuthHeaders(config);
 
-  if (options.dryRun || options.verbose) {
+  if (options.dryRun || options.debug) {
     process.stderr.write(`CALL ${config.url} → ${toolName}\n`);
     if (Object.keys(args).length) {
       process.stderr.write(`  Args: ${JSON.stringify(args)}\n`);

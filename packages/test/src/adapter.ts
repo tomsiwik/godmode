@@ -37,7 +37,7 @@ export const gm = (...args: string[]) => {
   const env = { ...process.env };
   const filtered = args.filter((a) => {
     if (a === '--dry-run') { env.GODMODE_DRY_RUN = '1'; return false; }
-    if (a === '--verbose') { env.GODMODE_VERBOSE = '1'; return false; }
+    if (a === '--debug') { env.GODMODE_DEBUG = '1'; return false; }
     return true;
   });
   try {

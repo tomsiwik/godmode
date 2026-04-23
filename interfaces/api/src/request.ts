@@ -1,11 +1,12 @@
 import type { Manifest } from 'godmode/spec';
+import { AuthStrategy } from '@godmode-cli/cli';
 import type { Match } from './match.js';
 
 interface RequestOptions {
   headers: Record<string, string>;
   query: Record<string, string>;
   body?: string;
-  verbose?: boolean;
+  debug?: boolean;
   dryRun?: boolean;
 }
 
@@ -37,14 +38,7 @@ export async function executeToString(manifest: Manifest, match: Match, options:
   }
 
   if (token) {
-    const authType = authConfig?.type || 'bearer';
-    if (authType === 'bearer') {
-      headers['Authorization'] = `Bearer ${token}`;
-    } else if (authType === 'api-key') {
-      headers[authConfig?.header || 'X-API-Key'] = token;
-    } else if (authType === 'basic') {
-      headers['Authorization'] = `Basic ${token}`;
-    }
+    AuthStrategy.for(authConfig).apply(headers, token);
   }
 
   if (options.body && !headers['Content-Type']) {
@@ -53,7 +47,7 @@ export async function executeToString(manifest: Manifest, match: Match, options:
 
   const method = match.route.method.toUpperCase();
 
-  if (options.dryRun || options.verbose) {
+  if (options.dryRun || options.debug) {
     process.stderr.write(`${method} ${url.toString()}\n`);
     for (const [k, v] of Object.entries(headers)) {
       process.stderr.write(`  ${k}: ${v}\n`);
@@ -72,7 +66,7 @@ export async function executeToString(manifest: Manifest, match: Match, options:
     body: options.body || undefined,
   });
 
-  if (options.verbose) {
+  if (options.debug) {
     process.stderr.write(`${response.status} ${response.statusText}\n`);
     response.headers.forEach((v, k) => process.stderr.write(`  ${k}: ${v}\n`));
     process.stderr.write('\n');

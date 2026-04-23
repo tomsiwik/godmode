@@ -12,19 +12,24 @@ const METHOD_POSITIONAL: Record<string, string> = {
   get: 'GET', post: 'POST', put: 'PUT', patch: 'PATCH', delete: 'DELETE', head: 'HEAD',
 };
 
-export const gm = (...args: string[]) => {
-  // Test-only: --dry-run and --verbose are no longer CLI flags; they map
-  // to env vars internally. Strip them from args and set the env vars.
+export const gm = (...args: string[]) => gmIn(undefined, ...args);
+
+/** Same as gm, but runs the CLI from a specific cwd. Used to exercise the
+ *  upward-walk resolver for project-scoped `.godmode/` directories. */
+export const gmIn = (cwd: string | undefined, ...args: string[]) => {
+  // Test-only: --dry-run and --debug are not CLI flags; they map to env
+  // vars internally. Strip them from args and set the env vars.
   const env = { ...process.env };
   const filtered = args.filter((a) => {
     if (a === '--dry-run') { env.GODMODE_DRY_RUN = '1'; return false; }
-    if (a === '--verbose') { env.GODMODE_VERBOSE = '1'; return false; }
+    if (a === '--debug') { env.GODMODE_DEBUG = '1'; return false; }
     return true;
   });
+  const cliEntry = resolve(__dirname, '..', 'dist', 'index.js');
   try {
     return execSync(
-      `node dist/index.js ${filtered.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
-      { cwd: resolve(__dirname, '..'), encoding: 'utf-8', timeout: 10000, env },
+      `node ${JSON.stringify(cliEntry)} ${filtered.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
+      { cwd: cwd ?? resolve(__dirname, '..'), encoding: 'utf-8', timeout: 10000, env },
     ).trim();
   } catch (e: any) {
     return (e.stdout || '').trim();
@@ -32,9 +37,7 @@ export const gm = (...args: string[]) => {
 };
 
 function loadManifest(name: string): Manifest {
-  const base = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
-    ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
-    : resolve(homedir(), '.godmode');
+  const base = resolve(homedir(), '.godmode');
   return JSON.parse(readFileSync(resolve(base, 'extensions', `${name}.json`), 'utf-8'));
 }
 

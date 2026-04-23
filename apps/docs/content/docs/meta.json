@@ -13,6 +13,7 @@
     "---Authentication---",
     "env-vars",
     "auth-types",
+    "permissions",
     "---Integrations---",
     "claude-code",
     "cursor",

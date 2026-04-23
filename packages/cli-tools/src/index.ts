@@ -116,21 +116,19 @@ export function printTable(rows: string[][], opts: { maxLineWidth?: number } = {
 
 // ── auth ─────────────────────────────────────────────────────
 
-export type AuthType = 'bearer' | 'api-key' | 'basic';
+export { AuthStrategy } from './auth.js';
+export type { AuthConfig, AuthType } from './auth.js';
+import { AuthStrategy as _AuthStrategy, type AuthType as _AuthType } from './auth.js';
 
 export interface AuthNote {
   env: string;
-  authType: AuthType;
+  authType: _AuthType;
   present: boolean;
 }
 
+/** Retained for back-compat; delegates to the strategy's missingMessage(). */
 export function authMissingLabel(type?: string): string {
-  switch (type) {
-    case 'api-key': return 'missing api-key';
-    case 'basic':   return 'missing basic auth credentials';
-    case 'bearer':
-    default:        return 'missing bearer token';
-  }
+  return _AuthStrategy.for({ type: type as _AuthType | undefined }).missingMessage();
 }
 
 // ── HelpPage ────────────────────────────────────────────────

@@ -1,5 +1,6 @@
-import { resolve, basename, dirname, extname } from 'node:path';
+import { resolve, basename, dirname, extname, parse as parsePath } from 'node:path';
 import { homedir } from 'node:os';
+import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile, readdir, unlink, access, rename } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
@@ -12,30 +13,80 @@ import {
   type MultiManifest,
 } from './spec.js';
 
-export const GODMODE_HOME = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
-  ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
-  : resolve(homedir(), '.godmode');
+/** Global config directory — always `~/.godmode`. */
+export const GODMODE_HOME = resolve(homedir(), '.godmode');
 
-/** Where compiled extension manifests live. Override with the
- *  `GODMODE_EXTENSIONS_DIR` environment variable (absolute or relative path;
- *  relative paths resolve against `process.cwd()`). */
-export const GODMODE_EXTENSIONS_DIR = process.env.GODMODE_EXTENSIONS_DIR
-  ? resolve(process.env.GODMODE_EXTENSIONS_DIR)
-  : resolve(GODMODE_HOME, 'extensions');
-
-/** Legacy pre-0.x location; migrated once on first run if present. */
-const LEGACY_APIS_DIR = resolve(GODMODE_HOME, 'apis');
+/** Scope for reads and writes. `project` = the nearest `.godmode/` walking
+ *  upward from cwd; `global` = `~/.godmode`. */
+export type Scope = 'project' | 'global';
 
 const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
 
-async function ensureDirs() {
-  // One-time migration from the pre-rename layout. Silent when nothing to do.
-  if ((await exists(LEGACY_APIS_DIR)) && !(await exists(GODMODE_EXTENSIONS_DIR))) {
-    await mkdir(dirname(GODMODE_EXTENSIONS_DIR), { recursive: true });
-    await rename(LEGACY_APIS_DIR, GODMODE_EXTENSIONS_DIR);
-    process.stderr.write(`Migrated ${LEGACY_APIS_DIR} -> ${GODMODE_EXTENSIONS_DIR}\n`);
+/** Files this CLI generates under `.godmode/` that should not be committed. */
+const GITIGNORE_CONTENT = `# godmode — runtime artifacts, do not commit
+node_modules/
+coding-agents/
+package-lock.json
+`;
+
+// ── directory resolution ─────────────────────────────────────
+
+/** Walk upward from `start` until a `.godmode/` directory is found. Returns
+ *  the full path to the directory, or null if none exists between `start`
+ *  and the filesystem root. Read-only — never creates anything. */
+function findProjectGodmode(start: string = process.cwd()): string | null {
+  let dir = resolve(start);
+  const root = parsePath(dir).root;
+  while (true) {
+    const candidate = resolve(dir, '.godmode');
+    if (existsSync(candidate)) return candidate;
+    if (dir === root) return null;
+    dir = dirname(dir);
   }
-  await mkdir(GODMODE_EXTENSIONS_DIR, { recursive: true });
+}
+
+/** Returns the extensions directory for a scope, lazily creating the
+ *  scope's base dir if it's a write operation. For project writes, this
+ *  also seeds a `.gitignore`. For global, it one-time-migrates the legacy
+ *  `apis/` name if present. */
+async function ensureScopeDir(scope: Scope): Promise<string> {
+  if (scope === 'global') {
+    await mkdir(GODMODE_HOME, { recursive: true });
+    const legacy = resolve(GODMODE_HOME, 'apis');
+    const target = resolve(GODMODE_HOME, 'extensions');
+    if ((await exists(legacy)) && !(await exists(target))) {
+      await rename(legacy, target);
+      process.stderr.write(`Migrated ${legacy} -> ${target}\n`);
+    }
+    await mkdir(target, { recursive: true });
+    return target;
+  }
+
+  // Project scope. Prefer an existing `.godmode/` above cwd; if none, seed
+  // a new one in cwd with a .gitignore so runtime artifacts are never
+  // accidentally committed.
+  let projectRoot = findProjectGodmode();
+  if (!projectRoot) {
+    projectRoot = resolve(process.cwd(), '.godmode');
+    await mkdir(projectRoot, { recursive: true });
+    await writeFile(resolve(projectRoot, '.gitignore'), GITIGNORE_CONTENT);
+  }
+  const target = resolve(projectRoot, 'extensions');
+  await mkdir(target, { recursive: true });
+  return target;
+}
+
+/** Read-only resolver: returns the extensions dir for a scope, or null if
+ *  nothing exists yet for that scope. Never creates anything. */
+function scopeExtensionsDirSync(scope: Scope): string | null {
+  if (scope === 'global') {
+    const d = resolve(GODMODE_HOME, 'extensions');
+    return existsSync(d) ? d : null;
+  }
+  const project = findProjectGodmode();
+  if (!project) return null;
+  const d = resolve(project, 'extensions');
+  return existsSync(d) ? d : null;
 }
 
 async function exists(path: string): Promise<boolean> {
@@ -117,8 +168,8 @@ async function resolveSource(input: string): Promise<{ name: string; source: Man
 
 // ── add: compile every declared interface, write a MultiManifest ──
 
-export async function addApi(input: string) {
-  await ensureDirs();
+export async function addApi(input: string, scope: Scope = 'project') {
+  const extensionsDir = await ensureScopeDir(scope);
 
   const resolved = await resolveSource(input).catch(() => null);
 
@@ -143,7 +194,7 @@ export async function addApi(input: string) {
         (multi.interfaces as Record<string, unknown>)[iface] = data;
       }
 
-      await writeFile(resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`), JSON.stringify(multi, null, 2));
+      await writeFile(resolve(extensionsDir, `${name}.json`), JSON.stringify(multi, null, 2));
 
       const ifaceSummary = ifaceKeys
         .map((k) => {
@@ -151,27 +202,30 @@ export async function addApi(input: string) {
           return d ? `${k}=${d.routes.length}` : k;
         })
         .join(', ');
-      process.stderr.write(`Registered "${name}" - interfaces: ${ifaceSummary}\n`);
+      process.stderr.write(`Registered "${name}" [${scope}] - interfaces: ${ifaceSummary}\n`);
       return;
     }
   }
 
-  // Package-based extension (no `interfaces` key) - install via npm
+  // Package-based extension (no `interfaces` key) — install via npm into
+  // the scope's root. Project scope installs under <cwd>/.godmode/,
+  // global under ~/.godmode.
+  const scopeRoot = scope === 'global' ? GODMODE_HOME : dirname(extensionsDir);
   const name = resolved?.name || input;
   const installTarget = resolved?.dir && (await exists(resolve(resolved.dir, 'package.json')))
     ? resolved.dir
     : (input.startsWith('@') ? input : `@godmode-cli/${input}`);
 
-  process.stderr.write(`Installing ${name}...\n`);
+  process.stderr.write(`Installing ${name} [${scope}]...\n`);
   try {
-    execSync(`npm install ${installTarget} --prefix ${GODMODE_HOME}`, { stdio: 'pipe' });
+    execSync(`npm install ${installTarget} --prefix ${scopeRoot}`, { stdio: 'pipe' });
   } catch (e: unknown) {
     const err = e as { stderr?: { toString(): string }; message?: string };
     throw new Error(`Failed to install ${name}: ${err.stderr?.toString().trim() || err.message}`);
   }
 
   const pkgName = `@godmode-cli/${name}`;
-  const mcpConfigPath = resolve(GODMODE_HOME, 'node_modules', pkgName, '.mcp.json');
+  const mcpConfigPath = resolve(scopeRoot, 'node_modules', pkgName, '.mcp.json');
   if (await exists(mcpConfigPath)) {
     process.stderr.write(`Installed "${name}" (MCP server extension)\n`);
   } else {
@@ -179,46 +233,94 @@ export async function addApi(input: string) {
   }
 }
 
-export async function updateApi(name: string) {
-  // Re-register by re-resolving + re-compiling.
-  await addApi(name);
+export async function updateApi(name: string, scope?: Scope) {
+  // If no scope given, update wherever the extension currently lives.
+  const resolvedScope = scope ?? findInstalledScope(name);
+  if (!resolvedScope) {
+    process.stderr.write(`Extension "${name}" not found\n`);
+    process.exit(1);
+  }
+  await addApi(name, resolvedScope);
 }
 
-export async function removeApi(name: string) {
+export async function removeApi(name: string, scope?: Scope) {
+  const resolvedScope = scope ?? findInstalledScope(name);
+  if (!resolvedScope) {
+    process.stderr.write(`Extension "${name}" not found\n`);
+    process.exit(1);
+  }
+  const dir = scopeExtensionsDirSync(resolvedScope);
+  if (!dir) {
+    process.stderr.write(`Extension "${name}" not found\n`);
+    process.exit(1);
+  }
   try {
-    await unlink(resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`));
-    process.stderr.write(`Removed "${name}"\n`);
+    await unlink(resolve(dir, `${name}.json`));
+    process.stderr.write(`Removed "${name}" [${resolvedScope}]\n`);
   } catch {
     process.stderr.write(`Extension "${name}" not found\n`);
     process.exit(1);
   }
 }
 
+/** Returns the scope in which `name` is installed, preferring project.
+ *  Null if not installed in either. */
+function findInstalledScope(name: string): Scope | null {
+  for (const scope of ['project', 'global'] as const) {
+    const dir = scopeExtensionsDirSync(scope);
+    if (dir && existsSync(resolve(dir, `${name}.json`))) return scope;
+  }
+  return null;
+}
+
 export async function listApis() {
-  await ensureDirs();
-  const files = await readdir(GODMODE_EXTENSIONS_DIR);
-  const apis = files.filter((f) => f.endsWith('.json'));
-  if (!apis.length) {
-    console.log('No extensions registered. Create a manifest.yaml and run: godmode extension add <name>');
+  const rows: Array<{ scope: Scope; slug: string; ifaces: string; routeTotal: number; description: string; shadowed: boolean }> = [];
+  const seen = new Set<string>();
+
+  // Project first so it gets to mark its slugs; globals with the same slug
+  // are annotated as shadowed.
+  for (const scope of ['project', 'global'] as const) {
+    const dir = scopeExtensionsDirSync(scope);
+    if (!dir) continue;
+    const files = (await readdir(dir)).filter((f) => f.endsWith('.json'));
+    for (const file of files) {
+      const m: MultiManifest = JSON.parse(await readFile(resolve(dir, file), 'utf-8'));
+      const shadowed = scope === 'global' && seen.has(m.slug);
+      seen.add(m.slug);
+      rows.push({
+        scope,
+        slug: m.slug,
+        ifaces: Object.keys(m.interfaces).join(', '),
+        routeTotal: Object.values(m.interfaces).reduce((n, d) => n + (d?.routes.length ?? 0), 0),
+        description: m.description || '',
+        shadowed,
+      });
+    }
+  }
+
+  if (!rows.length) {
+    console.log('No extensions installed. Run: godmode ext install <name>');
     return;
   }
-  for (const file of apis) {
-    const m: MultiManifest = JSON.parse(await readFile(resolve(GODMODE_EXTENSIONS_DIR, file), 'utf-8'));
-    const ifaces = Object.keys(m.interfaces).join(', ');
-    const desc = m.description ? `  ${m.description}` : '';
-    const routeTotal = Object.values(m.interfaces).reduce((n, d) => n + (d?.routes.length ?? 0), 0);
-    console.log(`  ${m.slug}\t[${ifaces}]\t${routeTotal} routes${desc}`);
+  for (const r of rows) {
+    const tag = `[${r.scope}${r.shadowed ? ', shadowed' : ''}]`;
+    const desc = r.description ? `  ${r.description}` : '';
+    console.log(`  ${r.slug}\t${tag}\t[${r.ifaces}]\t${r.routeTotal} routes${desc}`);
   }
 }
 
+/** Reads the manifest from the first scope that has it. Project scope
+ *  wins over global. */
 export async function loadMultiManifest(name: string): Promise<MultiManifest> {
-  await ensureDirs();
-  try {
-    return JSON.parse(await readFile(resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`), 'utf-8'));
-  } catch {
-    process.stderr.write(`Extension "${name}" not found. Create ${name}.yaml and run: godmode extension add ${name}\n`);
-    process.exit(1);
+  for (const scope of ['project', 'global'] as const) {
+    const dir = scopeExtensionsDirSync(scope);
+    if (!dir) continue;
+    const path = resolve(dir, `${name}.json`);
+    if (!existsSync(path)) continue;
+    return JSON.parse(await readFile(path, 'utf-8'));
   }
+  process.stderr.write(`Extension "${name}" not found. Run: godmode ext install ${name}\n`);
+  process.exit(1);
 }
 
 /**
@@ -243,4 +345,21 @@ export async function loadManifest(name: string, iface?: InterfaceKey): Promise<
     process.exit(1);
   }
   return projectManifest(multi, target);
+}
+
+/** Sync lookup used by the CLI dispatcher to decide whether a given slug is
+ *  an installed extension. Project-first, global fallback. */
+export function findInstalledManifestSync(name: string): MultiManifest | null {
+  for (const scope of ['project', 'global'] as const) {
+    const dir = scopeExtensionsDirSync(scope);
+    if (!dir) continue;
+    const path = resolve(dir, `${name}.json`);
+    if (!existsSync(path)) continue;
+    try {
+      return JSON.parse(readFileSync(path, 'utf-8')) as MultiManifest;
+    } catch {
+      return null;
+    }
+  }
+  return null;
 }

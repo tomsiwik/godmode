@@ -9,8 +9,8 @@ export interface ParsedArgs {
   filter?: string;
   methodFilter?: string;
   all: boolean;
-  /** Sourced from env vars GODMODE_VERBOSE / GODMODE_DRY_RUN; no user-facing flags. */
-  verbose: boolean;
+  /** Sourced from env vars GODMODE_DEBUG / GODMODE_DRY_RUN; no user-facing flags. */
+  debug: boolean;
   dryRun: boolean;
   help: boolean;
 }
@@ -27,7 +27,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   let filter: string | undefined;
   let methodFilter: string | undefined;
   let all = false;
-  const verbose = process.env.GODMODE_VERBOSE === '1';
+  const debug = process.env.GODMODE_DEBUG === '1';
   const dryRun = process.env.GODMODE_DRY_RUN === '1';
   let help = false;
 
@@ -72,7 +72,7 @@ export function parseArgs(args: string[]): ParsedArgs {
     }
   }
 
-  return { segments, method, explicitMethod, headers, query, body, filter, methodFilter, all, verbose, dryRun, help };
+  return { segments, method, explicitMethod, headers, query, body, filter, methodFilter, all, debug, dryRun, help };
 }
 
 export async function readStdin(): Promise<string | undefined> {

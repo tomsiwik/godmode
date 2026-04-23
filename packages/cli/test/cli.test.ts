@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll } from 'vitest';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { gm } from './adapter';
+import { gm, gmIn } from './adapter';
 
 const seg = (value: string, isParam = false) => ({ value, isParam });
 
@@ -77,7 +77,7 @@ describe('core CLI', () => {
     },
     {
       name: 'body sets Content-Type',
-      args: ['stripe', 'api', 'POST', 'customers', 'email=x', '--dry-run', '--verbose'],
+      args: ['stripe', 'api', 'POST', 'customers', 'email=x', '--dry-run', '--debug'],
       contains: ['Content-Type: application/json'],
     },
     {
@@ -166,7 +166,7 @@ describe('core CLI', () => {
   it.each([
     {
       name: '-H custom header',
-      args: ['stripe', 'api', 'GET', 'account', '-H', 'X-Custom:value', '--dry-run', '--verbose'],
+      args: ['stripe', 'api', 'GET', 'account', '-H', 'X-Custom:value', '--dry-run', '--debug'],
       contains: ['X-Custom: value'],
     },
   ])('$name', ({ args, contains }) => {
@@ -263,21 +263,21 @@ describe('auth types', () => {
       label: 'bearer puts token in Authorization: Bearer',
       envKey: 'AUTH_BEARER',
       envVal: 'tok_bearer_abc',
-      args: ['authbearer', 'api', 'GET', 'ping', '--dry-run', '--verbose'],
+      args: ['authbearer', 'api', 'GET', 'ping', '--dry-run', '--debug'],
       contains: 'Authorization: Bearer tok_bearer_abc',
     },
     {
       label: 'api-key puts token in custom header',
       envKey: 'AUTH_KEY',
       envVal: 'key_xyz',
-      args: ['authapikey', 'api', 'GET', 'ping', '--dry-run', '--verbose'],
+      args: ['authapikey', 'api', 'GET', 'ping', '--dry-run', '--debug'],
       contains: 'X-Custom-Key: key_xyz',
     },
     {
       label: 'basic puts token in Authorization: Basic',
       envKey: 'AUTH_BASIC',
       envVal: 'dXNlcjpwYXNz',
-      args: ['authbasic', 'api', 'GET', 'ping', '--dry-run', '--verbose'],
+      args: ['authbasic', 'api', 'GET', 'ping', '--dry-run', '--debug'],
       contains: 'Authorization: Basic dXNlcjpwYXNz',
     },
   ])('$label', ({ envKey, envVal, args, contains }) => {
@@ -299,7 +299,7 @@ describe('auth types', () => {
     process.env.AUTH_DEFAULT = 'default_tok';
     try {
       expect(
-        gm('authdefault', 'api', 'GET', 'ping', '--dry-run', '--verbose'),
+        gm('authdefault', 'api', 'GET', 'ping', '--dry-run', '--debug'),
       ).toContain('Authorization: Bearer default_tok');
     } finally {
       delete process.env.AUTH_DEFAULT;
@@ -310,5 +310,63 @@ describe('auth types', () => {
     expect(gm('authbearer', 'api', '--help')).toContain('missing bearer token');
     expect(gm('authapikey', 'api', '--help')).toContain('missing api-key');
     expect(gm('authbasic', 'api', '--help')).toContain('missing basic auth credentials');
+  });
+});
+
+// ── project-scope resolution ─────────────────────────────────
+
+describe('project scope', () => {
+  let projectDir: string;
+
+  beforeAll(async () => {
+    // Seed a project-scoped extension that shadows a same-name global one.
+    // The global "stripe" lives at api.stripe.com (from the core CLI fixture);
+    // the project copy points at api.stripe-test.com so a successful override
+    // is visible in the dry-run URL.
+    projectDir = await mkdtemp(resolve(tmpdir(), 'godmode-project-test-'));
+    await mkdir(resolve(projectDir, '.godmode', 'extensions'), { recursive: true });
+    await writeFile(
+      resolve(projectDir, '.godmode', 'extensions', 'stripe.json'),
+      JSON.stringify({
+        name: 'Stripe',
+        slug: 'stripe',
+        description: 'Project override',
+        auth: { env: 'STRIPE_API_KEY', type: 'bearer' },
+        interfaces: {
+          api: {
+            type: 'api',
+            specVersion: 'test',
+            url: 'https://api.stripe-test.com',
+            versions: [{ name: 'v1', prefix: '/v1' }],
+            resourceDescriptions: { customers: 'Customer resources' },
+            routes: [
+              { path: '/v1/customers', method: 'get', summary: 'List', version: 'v1', segments: [{ value: 'customers', isParam: false }] },
+            ],
+          },
+        },
+      }),
+    );
+  });
+
+  it('project .godmode/ wins over global', () => {
+    // From the project cwd the override should be picked up.
+    expect(
+      gmIn(projectDir, 'stripe', 'api', 'GET', 'customers', '--dry-run'),
+    ).toContain('https://api.stripe-test.com/v1/customers');
+  });
+
+  it('walk-up does not leak across siblings', () => {
+    // From packages/cli (no .godmode/ anywhere up the tree except ~/.godmode)
+    // the global fixture should win.
+    expect(gm('stripe', 'api', 'GET', 'customers', '--dry-run')).toContain(
+      'https://api.stripe.com/v1/customers',
+    );
+  });
+
+  it('list tags scopes', () => {
+    const out = gmIn(projectDir, 'ext', 'list');
+    expect(out).toContain('[project]');
+    // Global fixtures from the earlier describe (authbearer, etc.) show up here.
+    expect(out).toContain('[global]');
   });
 });

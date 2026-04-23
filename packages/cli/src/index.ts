@@ -1,5 +1,3 @@
-import { existsSync, readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
 import { loadEnv } from './env.js';
 import {
   removeApi,
@@ -7,19 +5,13 @@ import {
   listApis,
   loadManifest,
   loadMultiManifest,
-  GODMODE_HOME,
-  GODMODE_EXTENSIONS_DIR,
+  findInstalledManifestSync,
 } from './config.js';
 import type { InterfaceKey, MultiManifest } from './spec.js';
-import { matchRoute, suggestRoutes } from '@godmode-cli/interface-api/match';
-import { execute } from '@godmode-cli/interface-api/request';
-import { validateGraphQLFlags } from '@godmode-cli/interface-graphql';
-import { validateMcpFlags, executeMcpTool } from '@godmode-cli/interface-mcp';
-import { runMcp } from '@godmode-cli/interface-mcp/command';
-import { parseArgs, readStdin } from './args.js';
+import { parseArgs } from './args.js';
 import { showHelp, showApiHelp, showExtensionOverview, showExtensionVersion, showVersion } from './help.js';
 import { runAgentCommand } from '@godmode-cli/command-agent';
-import type { Route } from './spec.js';
+import { getInterface } from './interfaces.js';
 
 loadEnv();
 
@@ -105,13 +97,7 @@ async function main() {
 }
 
 function installedExtension(name: string): MultiManifest | null {
-  const extPath = resolve(GODMODE_EXTENSIONS_DIR, `${name}.json`);
-  if (!existsSync(extPath)) return null;
-  try {
-    return JSON.parse(readFileSync(extPath, 'utf-8')) as MultiManifest;
-  } catch {
-    return null;
-  }
+  return findInstalledManifestSync(name);
 }
 
 function declaredInterfaces(m: MultiManifest): InterfaceKey[] {
@@ -129,11 +115,26 @@ function showExtHelp() {
 Usage: godmode ext <command> [args]
 
 Commands:
-  install <name|folder>    Install an extension
-  uninstall <name>         Uninstall an extension
-  update <name>            Re-fetch spec, rebuild routes
-  list                     Show installed extensions
-  create                   Interactive manifest wizard`);
+  install <name|folder>     Install an extension (project scope)
+  uninstall <name>          Uninstall an extension
+  update <name>             Re-fetch spec, rebuild routes
+  list                      Show installed extensions (project + global)
+  create                    Interactive manifest wizard
+
+Options:
+  -g, --global              Apply to ~/.godmode (default: <cwd>/.godmode)`);
+}
+
+/** Pull `-g` / `--global` out of the args list, return the remaining args
+ *  plus the resolved scope. */
+function extractScope(args: string[]): { rest: string[]; scope: 'project' | 'global' | undefined } {
+  const rest: string[] = [];
+  let global = false;
+  for (const a of args) {
+    if (a === '-g' || a === '--global') { global = true; continue; }
+    rest.push(a);
+  }
+  return { rest, scope: global ? 'global' : undefined };
 }
 
 async function runExt(rest: string[]) {
@@ -143,28 +144,30 @@ async function runExt(rest: string[]) {
     return;
   }
 
+  const { rest: cmdArgs, scope } = extractScope(rest.slice(1));
+
   if (cmd === 'install') {
-    const target = rest[1];
-    if (!target) { console.error('Usage: godmode ext install <name|folder>'); process.exit(1); }
+    const target = cmdArgs[0];
+    if (!target) { console.error('Usage: godmode ext install [-g] <name|folder>'); process.exit(1); }
     if (RESERVED_SLUGS.has(target)) {
       process.stderr.write(`'${target}' is a reserved extension slug and cannot be installed.\n`);
       process.stderr.write(`Reserved: ${[...RESERVED_SLUGS].join(', ')}.\n`);
       process.exit(1);
     }
     const { runAdd } = await import('./commands/add.js');
-    await runAdd(rest.slice(1));
+    await runAdd(cmdArgs, scope ?? 'project');
     return;
   }
 
   if (cmd === 'uninstall') {
-    if (!rest[1]) { console.error('Usage: godmode ext uninstall <name>'); process.exit(1); }
-    await removeApi(rest[1]);
+    if (!cmdArgs[0]) { console.error('Usage: godmode ext uninstall [-g] <name>'); process.exit(1); }
+    await removeApi(cmdArgs[0], scope);
     return;
   }
 
   if (cmd === 'update') {
-    if (!rest[1]) { console.error('Usage: godmode ext update <name>'); process.exit(1); }
-    await updateApi(rest[1]);
+    if (!cmdArgs[0]) { console.error('Usage: godmode ext update [-g] <name>'); process.exit(1); }
+    await updateApi(cmdArgs[0], scope);
     return;
   }
 
@@ -220,126 +223,32 @@ async function runInterface(iface: string, extensionName: string, rest: string[]
     return;
   }
 
-  const parsed = parseArgs(rest);
   const ifaceKey = iface as InterfaceKey;
+  const parsed = parseArgs(rest);
   const multi = await loadMultiManifest(extensionName);
   const manifest = await loadManifest(extensionName, ifaceKey);
 
-  // In any help context (explicit --help OR no resource given), an explicit
-  // method (positional GET/POST/…, or -g, -po, …) implicitly filters the
-  // resources list to that verb.
-  const implicitMethodFilter =
-    parsed.methodFilter || (parsed.explicitMethod ? parsed.method : undefined);
+  const handler = getInterface({
+    iface: ifaceKey, extensionName, manifest, multi, parsed, rawRest: rest,
+  });
 
   if (parsed.help) {
-    showApiHelp(manifest, extensionName, parsed.segments, parsed.filter, implicitMethodFilter, parsed.all, multi);
-    return;
-  }
-
-  // Bare `godmode mcp <ext>` with no tool → serve as MCP server over stdio.
-  // With a tool (segments), fall through to executeMcpTool below.
-  if (iface === 'mcp' && !parsed.segments.length) {
-    await runMcp(
-      { godmodeHome: GODMODE_HOME, loadManifest: (n) => loadManifest(n, 'mcp') },
-      [extensionName, ...rest],
-    );
+    handler.showHelp();
     return;
   }
 
   if (!parsed.segments.length) {
-    showApiHelp(manifest, extensionName, parsed.segments, parsed.filter, implicitMethodFilter, parsed.all, multi);
+    await handler.handleEmpty();
     return;
   }
 
-  // For REST APIs, the HTTP method is a required positional. GraphQL and MCP
-  // don't use it (GraphQL always POSTs, MCP dispatches by tool name).
-  if (iface === 'api' && !parsed.explicitMethod) {
-    process.stderr.write(`Missing HTTP method. Try: godmode ${extensionName} api GET ${parsed.segments.join(' ')}\n`);
-    process.stderr.write(`Valid methods: GET, POST, PUT, PATCH, DELETE, HEAD.\n`);
+  const err = handler.validate();
+  if (err) {
+    process.stderr.write(err + '\n');
     process.exit(1);
   }
 
-  // ── graphql ──
-
-  if (iface === 'graphql') {
-    const err = validateGraphQLFlags(parsed.method, parsed.query, parsed.body, extensionName);
-    if (err) { process.stderr.write(err + '\n'); process.exit(1); }
-  }
-
-  // ── api (REST) ──
-
-  if (manifest.config.type === 'mcp') {
-    const err = validateMcpFlags(parsed.method, parsed.query);
-    if (err) { process.stderr.write(err + '\n'); process.exit(1); }
-    const result = await executeMcpTool(manifest.config, parsed.segments[0], parsed.body, {
-      verbose: parsed.verbose,
-      dryRun: parsed.dryRun,
-    });
-    if (result) process.stdout.write(result + '\n');
-    return;
-  }
-
-  const query = parsed.query;
-  const hasBody = Object.keys(parsed.body).length > 0;
-  let body: string | undefined = hasBody ? JSON.stringify(parsed.body) : undefined;
-
-  if (!body && ['post', 'put', 'patch'].includes(parsed.method)) body = await readStdin();
-
-  if (parsed.segments[0]?.startsWith('/')) {
-    const rawPath = parsed.segments[0];
-    const syntheticRoute: Route = { path: rawPath, method: parsed.method, summary: '', version: '', segments: [] };
-    await execute(manifest, { route: syntheticRoute, params: {} }, {
-      headers: parsed.headers, query, body,
-      verbose: parsed.verbose, dryRun: parsed.dryRun,
-    });
-    return;
-  }
-
-  const match = matchRoute(manifest, parsed.segments, parsed.method);
-
-  if (!match) {
-    // Helpful nudge: if a trailing segment looks like an HTTP verb, the user
-    // likely typed `resource METHOD` instead of `METHOD resource`.
-    const HTTP_VERBS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
-    const trailingVerb = parsed.segments
-      .map((s) => s.toUpperCase())
-      .find((s) => HTTP_VERBS.has(s));
-    if (trailingVerb) {
-      const rest = parsed.segments.filter((s) => s.toUpperCase() !== trailingVerb);
-      process.stderr.write(`No route matching: ${parsed.segments.join(' ')}\n`);
-      process.stderr.write(`Method goes first: try 'godmode ${extensionName} ${iface} ${trailingVerb} ${rest.join(' ')}'\n`);
-      process.exit(1);
-    }
-
-    process.stderr.write(`No ${parsed.method.toUpperCase()} route matching: ${parsed.segments.join(' ')}\n`);
-
-    for (const m of ['get', 'post', 'put', 'patch', 'delete'] as const) {
-      if (m === parsed.method) continue;
-      const alt = matchRoute(manifest, parsed.segments, m);
-      if (alt) {
-        process.stderr.write(`  try: godmode ${extensionName} api ${m.toUpperCase()} ${parsed.segments.join(' ')}\n`);
-      }
-    }
-
-    const similar = suggestRoutes(manifest, parsed.segments).slice(0, 5);
-    if (similar.length) {
-      process.stderr.write('\nSimilar:\n');
-      const seen = new Set<string>();
-      for (const r of similar) {
-        const p = r.segments.map((s) => (s.isParam ? `{${s.value}}` : s.value)).join(' ');
-        if (seen.has(p)) continue;
-        seen.add(p);
-        process.stderr.write(`  ${p}\n`);
-      }
-    }
-
-    process.exit(1);
-  }
-
-  await execute(manifest, match, {
-    headers: parsed.headers, query, body, token: parsed.token,
-    verbose: parsed.verbose, dryRun: parsed.dryRun,
-  });
+  await handler.execute();
 }
 
 main().catch((err) => {

@@ -9,6 +9,9 @@
     ".": "./src/index.ts"
   },
   "files": ["src"],
+  "dependencies": {
+    "@godmode-cli/cli": "workspace:*"
+  },
   "devDependencies": {
     "typescript": "^5.5.0"
   }

@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { isAbsolute, resolve } from 'node:path';
 import type { ApiConfig, Manifest, Route } from 'godmode/spec';
+import { AuthStrategy } from '@godmode-cli/cli';
 
 // ── introspection ───────────────────────────────────────────
 
@@ -91,9 +92,7 @@ export async function parseGraphQL(name: string, config: ApiConfig): Promise<Man
     const headers: Record<string, string> = { ...config.headers };
     const token = config.auth?.env ? process.env[config.auth.env] : undefined;
     if (token) {
-      const authType = config.auth?.type || 'bearer';
-      if (authType === 'bearer') headers['Authorization'] = `Bearer ${token}`;
-      else if (authType === 'api-key') headers[config.auth?.header || 'X-API-Key'] = token;
+      AuthStrategy.for(config.auth).apply(headers, token);
     }
 
     types = await introspect(config.url, headers);
