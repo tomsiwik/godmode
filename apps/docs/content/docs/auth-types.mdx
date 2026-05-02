@@ -1,6 +1,64 @@
 ---
-title: Auth types
-description: bearer, api-key, basic — and the header each lands in.
+title: Authentication types
+description: The three credential shapes godmode understands, and how each maps to a request header.
 ---
 
-> TODO: pull the canonical table from `developers/reference/auth-types` (single source of truth — link there). Summarize in 3 lines: `bearer` → `Authorization: Bearer`, `api-key` → `auth.header`, `basic` → `Authorization: Basic <base64>`. Show the `--> missing <type>` note for each.
+Every extension declares one of three auth types in its manifest. godmode reads the env var, builds the right header, and you don't think about it again. The full reference (with manifest examples per type) lives in [Developers → Auth types](/developers/auth-types) — this page is the user-facing summary.
+
+## The three types
+
+| Type      | Header sent                              | Env var holds                  | Example extension |
+|-----------|------------------------------------------|--------------------------------|-------------------|
+| `bearer`  | `Authorization: Bearer <env>`            | The raw token                  | `stripe`, `openai` |
+| `api-key` | `<custom-header>: <env>`                 | The raw key                    | varies; manifest names the header |
+| `basic`   | `Authorization: Basic <env>`             | A **pre-encoded** `user:pass` (base64) | rare |
+
+That's the whole model. Whichever type an extension uses, the env var name is shown in `godmode <ext> --help`.
+
+## Quick examples
+
+**Bearer (Stripe, OpenAI):**
+
+```sh
+export STRIPE_API_KEY=sk_test_abc
+godmode stripe api GET customers
+# → Authorization: Bearer sk_test_abc
+```
+
+**API key (custom header):**
+
+```sh
+export ACME_KEY=ak_live_xyz
+godmode acme api GET widgets
+# → X-Acme-Api-Key: ak_live_xyz   (header name comes from the manifest)
+```
+
+**Basic (pre-encoded):**
+
+```sh
+export LEGACY_AUTH=$(printf 'user:pass' | base64)
+godmode legacy api GET things
+# → Authorization: Basic dXNlcjpwYXNz
+```
+
+<Callout type="warn">
+  `basic` does **not** base64-encode for you. The env var must already contain the encoded `user:pass`. This avoids accidentally encoding twice and lets you store the encoded form in a secret manager.
+</Callout>
+
+## Missing credentials
+
+When the env var isn't set, godmode exits before dispatching the request:
+
+```
+$ godmode stripe api GET customers
+Blocked: STRIPE_API_KEY is not set. Set it in your shell or in a .env in the current directory.
+  --> missing bearer credentials for stripe
+```
+
+The trailing `--> missing <type>` line is consistent across all three types — useful for grepping CI logs.
+
+## See also
+
+- [Environment variables](/docs/env-vars) — how the env var is resolved.
+- [Permissions](/docs/permissions) — restrict which routes an authenticated extension can hit.
+- [Developers → Auth types](/developers/auth-types) — full table including how to declare each type in a manifest.

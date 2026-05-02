@@ -1,7 +1,7 @@
 import { createFileRoute, Link, notFound } from '@tanstack/react-router';
 import { DocsLayout } from '@/components/layout/notebook';
 import { createServerFn } from '@tanstack/react-start';
-import { getPageImage, SITE_URL, source } from '@/lib/source';
+import { getPageImage, SITE_URL } from '@/lib/site';
 import browserCollections from 'collections/browser';
 import {
   DocsBody,
@@ -54,6 +54,7 @@ const loader = createServerFn({
 })
   .inputValidator((slugs: string[]) => slugs)
   .handler(async ({ data: slugs }) => {
+    const { source } = await import('@/lib/source');
     const page = source.getPage(slugs);
     if (!page) throw notFound();
 

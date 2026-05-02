@@ -10,12 +10,14 @@
     "./match": "./src/match.ts",
     "./request": "./src/request.ts"
   },
-  "files": ["src"],
+  "files": [
+    "src"
+  ],
   "dependencies": {
     "@godmode-cli/cli": "workspace:*",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.4"
   },
   "devDependencies": {
-    "typescript": "^5.5.0"
+    "typescript": "^6.0.3"
   }
 }

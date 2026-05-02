@@ -22,6 +22,7 @@ export function LandingHeader() {
           <img src="/godmode-nav.svg" alt="godmode" className="h-7 dark:invert" />
         </a>
         <div className="flex flex-1 items-center justify-end gap-2">
+          <ThemeToggle />
           <a
             href={githubUrl}
             target="_blank"
@@ -33,7 +34,6 @@ export function LandingHeader() {
             )}>
             <GitHubIcon className="size-4" />
           </a>
-          <ThemeToggle mode="light-dark-system" />
           <Button asChild size="sm">
             <a href="/docs">
               <span>Documentation</span>

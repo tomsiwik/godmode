@@ -237,7 +237,7 @@ export function DocsLayout(props: DocsLayoutProps) {
             )}
             {themeSwitch.enabled !== false &&
               (themeSwitch.component ?? (
-                <ThemeToggle mode={themeSwitch.mode ?? 'light-dark-system'} />
+                <ThemeToggle />
               ))}
           </Footer>
         </SidebarDrawer>
@@ -344,6 +344,10 @@ function DocsNavbar({
                 <NavbarLinkItem key={i} item={item} />
               ))}
           </div>
+          {themeSwitch.enabled !== false &&
+            (themeSwitch.component ?? (
+              <ThemeToggle className="max-lg:hidden" />
+            ))}
           {links
             .filter((item) => item.type === 'icon')
             .map((item, i) => (
@@ -386,7 +390,7 @@ function DocsNavbar({
               )}
               {themeSwitch.enabled !== false &&
                 (themeSwitch.component ?? (
-                  <ThemeToggle mode={themeSwitch.mode ?? 'light-dark-system'} />
+                  <ThemeToggle />
                 ))}
               {sidebarCollapsible && navMode === 'top' && (
                 <SidebarCollapseTrigger
@@ -432,10 +436,6 @@ function DocsNavbar({
                 <Languages className="size-4.5 text-fd-muted-foreground" />
               </LanguageToggle>
             )}
-            {themeSwitch.enabled !== false &&
-              (themeSwitch.component ?? (
-                <ThemeToggle mode={themeSwitch.mode ?? 'light-dark-system'} />
-              ))}
           </div>
         </div>
       )}

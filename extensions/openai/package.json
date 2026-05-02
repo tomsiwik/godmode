@@ -12,14 +12,26 @@
     "directory": "extensions/openai"
   },
   "bugs": "https://github.com/tomsiwik/godmode/issues",
-  "keywords": ["godmode", "extension", "openai", "api", "mcp"],
-  "exports": { "./manifest": "./manifest.yaml" },
-  "files": ["manifest.yaml", "README.md", "LICENSE"],
+  "keywords": [
+    "godmode",
+    "extension",
+    "openai",
+    "api",
+    "mcp"
+  ],
+  "exports": {
+    "./manifest": "./manifest.yaml"
+  },
+  "files": [
+    "manifest.yaml",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "vitest run"
   },
   "devDependencies": {
     "@godmode-cli/test": "workspace:*",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.5"
   }
 }

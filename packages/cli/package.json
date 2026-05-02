@@ -45,18 +45,18 @@
     "@godmode-cli/interface-api": "workspace:*",
     "@godmode-cli/interface-graphql": "workspace:*",
     "@godmode-cli/interface-mcp": "workspace:*",
-    "@hey-api/openapi-ts": "^0.94.0",
-    "@modelcontextprotocol/sdk": "^1.12.1",
+    "@hey-api/openapi-ts": "^0.97.0",
+    "@modelcontextprotocol/sdk": "^1.29.0",
     "fuzzysort": "^3.1.0",
     "prompts": "^2.4.2",
-    "yaml": "^2.8.0"
+    "yaml": "^2.8.4"
   },
   "devDependencies": {
-    "@types/node": "^22.0.0",
+    "@types/node": "^25.6.0",
     "@types/prompts": "^2.4.9",
-    "tsup": "^8.0.0",
-    "typescript": "^5.5.0",
-    "vitest": "^4.1.0"
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.5"
   },
   "engines": {
     "node": ">=20.0.0"

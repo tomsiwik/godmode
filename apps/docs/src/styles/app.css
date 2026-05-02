@@ -8,13 +8,21 @@
 :root {
   --fd-layout-width: 90rem;
   --fd-scroll-offset: 24px;
-  --color-fd-primary: #ff0056;
-  --color-fd-primary-foreground: #fff;
+  /* Brand: agentic-violet, OKLCH for perceptual stability across light/dark.
+     L = 0.55 sits in the readable middle; C = 0.32 pushes saturation to the
+     P3 gamut limit (sRGB displays will gamut-map cleanly). H = 295° is
+     violet tilted blue — distinct from Anthropic's red-violet and OpenAI's
+     pink. */
+  --color-fd-primary: oklch(0.55 0.32 295);
+  --color-fd-primary-foreground: oklch(0.99 0.01 295);
 }
 
 .dark {
-  --color-fd-primary: #ff0056;
-  --color-fd-primary-foreground: #fff;
+  /* Bump lightness on dark backgrounds so contrast against fd-background
+     (near-black) stays comfortable without changing hue. Chroma stays
+     near-max for the brand pop. */
+  --color-fd-primary: oklch(0.72 0.28 295);
+  --color-fd-primary-foreground: oklch(0.15 0.04 295);
 }
 
 @layer base {

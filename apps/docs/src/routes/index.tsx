@@ -1,7 +1,8 @@
 import { createFileRoute } from '@tanstack/react-router';
 import { LandingHeader } from '@/components/layout/landing-header';
 import { InstallCommand } from '@/components/install-command';
-import { SITE_URL } from '@/lib/source';
+import { PixelShimmer } from '@/components/pixel-shimmer';
+import { SITE_URL } from '@/lib/site';
 
 const TITLE = 'Godmode — the swiss army knife for coding agents';
 const DESCRIPTION = 'One predictable CLI for every API, MCP server, and local command you install.';
@@ -37,7 +38,9 @@ function Home() {
     <div className="flex flex-col min-h-screen bg-fd-background text-fd-foreground">
       <LandingHeader />
       <main className="flex flex-1 flex-col items-center justify-center gap-6 px-6 py-24 text-center">
-        <img src="/godmode-pixels.svg" alt="godmode" className="mx-auto w-full max-w-lg dark:invert" />
+        <PixelShimmer className="mx-auto w-full max-w-lg">
+          <img src="/godmode-pixels.svg" alt="godmode" className="w-full dark:invert" />
+        </PixelShimmer>
         <p className="max-w-xl text-balance text-lg text-fd-muted-foreground">
           The swiss army knife for coding agents, with extensions.
         </p>

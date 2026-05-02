@@ -13,15 +13,21 @@
     "release": "turbo build && changeset publish"
   },
   "devDependencies": {
-    "@changesets/cli": "^2.30.0",
-    "prettier": "^3.7.0",
-    "turbo": "^2.7.0"
+    "@changesets/cli": "^2.31.0",
+    "prettier": "^3.8.3",
+    "turbo": "^2.9.7"
   },
   "packageManager": "pnpm@10.33.0",
   "pnpm": {
     "supportedArchitectures": {
-      "os": ["linux", "darwin"],
-      "cpu": ["x64", "arm64"]
+      "os": [
+        "linux",
+        "darwin"
+      ],
+      "cpu": [
+        "x64",
+        "arm64"
+      ]
     }
   }
 }

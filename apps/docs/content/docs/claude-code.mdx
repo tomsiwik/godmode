@@ -1,6 +1,112 @@
 ---
 title: Claude Code
-description: Full mcpServers config for godmode extensions.
+description: Wire godmode extensions into Claude Code as MCP servers, with a single Bash permission for the rest.
 ---
 
-> TODO: expand on getting-started's minimal snippet. Multiple extensions, env forwarding, scoping per project vs global.
+There are two ways to give Claude Code access to a godmode extension. They compose — pick one or both per extension.
+
+| | Looks like to Claude | Best for |
+|---|---|---|
+| **MCP server** | A native tool with typed parameters per route | Stripe, GitHub, structured APIs you want Claude to call by tool name |
+| **Bash invocation** | `Bash(godmode:*)` permission, Claude writes `godmode <ext> ...` | Quick experiments, extensions you haven't wired as MCP yet, agent-side scripting |
+
+The Bash route is the one-permission story from the README — `Bash(godmode:*)` unlocks every installed extension at once. The MCP route is more granular and gives Claude proper tool definitions.
+
+## MCP: one extension at a time
+
+In Claude Code's MCP config (`~/.claude/settings.json` for global, `.claude/settings.local.json` for per-project):
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["stripe", "mcp"],
+      "env": { "STRIPE_API_KEY": "sk_test_..." }
+    },
+    "github": {
+      "command": "godmode",
+      "args": ["github", "mcp"],
+      "env": { "GITHUB_TOKEN": "ghp_..." }
+    }
+  }
+}
+```
+
+Each entry spawns its own godmode process serving that extension over stdio. Claude sees `mcp__stripe__create_customer`, `mcp__github__viewer`, etc. as native tools.
+
+<Callout type="info">
+  Don't put long-lived secrets directly in `settings.json` you commit. Either use `settings.local.json` (gitignored by default) or omit `env` entirely — godmode will read the var from your shell when Claude Code launches.
+</Callout>
+
+## Bash: one permission for everything
+
+Add to your project's `.claude/settings.json`:
+
+```json
+{
+  "permissions": {
+    "allow": ["Bash(godmode:*)"]
+  }
+}
+```
+
+Now Claude can run any installed extension without further prompts:
+
+```sh
+godmode stripe api GET customers limit==5
+godmode openai api POST chat/completions model=gpt-4 messages='[...]'
+godmode slack api POST chat.postMessage channel=C123 text=hi
+```
+
+Combine with [permissions](/docs/permissions) to scope what Claude can actually do per-extension — read-only stripe, no DELETEs anywhere, etc.
+
+## Per-project vs global
+
+| Scope | godmode storage | Claude Code config |
+|---|---|---|
+| **Project** | `<project>/.godmode/extensions/` | `<project>/.claude/settings.local.json` |
+| **Global** | `~/.godmode/extensions/` | `~/.claude/settings.json` |
+
+godmode resolves project-first then falls back to global. Claude Code merges global + project. So a sensible setup is:
+
+```sh
+# global: tools you use everywhere
+godmode -g ext install context7
+godmode -g ext install github
+
+# project: tools just for this codebase
+cd ~/projects/checkout
+godmode ext install stripe
+```
+
+…paired with global Claude Code settings that wire `context7` and `github` as MCP servers, plus a project `settings.local.json` that adds `stripe` for this project only.
+
+## Forwarding env at launch time
+
+When Claude Code spawns the godmode process, only the env declared in `mcpServers.<n>.env` is forwarded — Claude's own shell env is not. If you'd rather not duplicate secrets in `settings.json`, launch Claude Code from a shell that already has them exported, and reference them in the config:
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["stripe", "mcp"],
+      "env": { "STRIPE_API_KEY": "${STRIPE_API_KEY}" }
+    }
+  }
+}
+```
+
+`${VAR}` is interpolated by Claude Code from its own env, then passed through to godmode.
+
+## Skills
+
+If you also want Claude to *know* how to use an extension (resource names, gotchas, idiomatic queries), install the corresponding godmode skill:
+
+```sh
+npx skills add tomsiwik/godmode                    # the umbrella skill
+npx skills add tomsiwik/godmode --skill godmode    # just the umbrella, explicit
+```
+
+The umbrella skill teaches Claude the grammar; per-extension skills (when published) teach service-specific patterns. See [Skills](https://github.com/tomsiwik/godmode/tree/main/skills) for what's available.

@@ -12,14 +12,27 @@
     "directory": "extensions/github"
   },
   "bugs": "https://github.com/tomsiwik/godmode/issues",
-  "keywords": ["godmode", "extension", "github", "api", "graphql", "mcp"],
-  "exports": { "./manifest": "./manifest.yaml" },
-  "files": ["manifest.yaml", "README.md", "LICENSE"],
+  "keywords": [
+    "godmode",
+    "extension",
+    "github",
+    "api",
+    "graphql",
+    "mcp"
+  ],
+  "exports": {
+    "./manifest": "./manifest.yaml"
+  },
+  "files": [
+    "manifest.yaml",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "test": "vitest run"
   },
   "devDependencies": {
     "@godmode-cli/test": "workspace:*",
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.5"
   }
 }

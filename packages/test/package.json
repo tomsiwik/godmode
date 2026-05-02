@@ -12,20 +12,28 @@
     "directory": "packages/test"
   },
   "bugs": "https://github.com/tomsiwik/godmode/issues",
-  "keywords": ["godmode", "testing", "extension"],
+  "keywords": [
+    "godmode",
+    "testing",
+    "extension"
+  ],
   "exports": {
     ".": "./src/adapter.ts"
   },
-  "files": ["dist", "README.md", "LICENSE"],
+  "files": [
+    "dist",
+    "README.md",
+    "LICENSE"
+  ],
   "scripts": {
     "build": "tsup src/adapter.ts --format esm --clean"
   },
   "dependencies": {
-    "vitest": "^4.1.0"
+    "vitest": "^4.1.5"
   },
   "devDependencies": {
-    "tsup": "^8.0.0",
-    "typescript": "^5.5.0",
-    "@types/node": "^22.0.0"
+    "@types/node": "^25.6.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3"
   }
 }

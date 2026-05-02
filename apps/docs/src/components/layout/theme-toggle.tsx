@@ -1,79 +1,68 @@
 'use client';
-import { cva } from 'class-variance-authority';
-import { Airplay, Moon, Sun } from 'lucide-react';
+import { Monitor, Moon, Sun } from 'lucide-react';
 import { useTheme } from 'next-themes';
-import { ComponentProps, useEffect, useState } from 'react';
+import { type ComponentProps, useEffect, useState } from 'react';
+import { buttonVariants } from '@godmode-cli/ui';
 import { cn } from '../../lib/cn';
 
-const itemVariants = cva('size-6.5 p-1.5 rounded-md text-fd-muted-foreground transition-all', {
-  variants: {
-    active: {
-      true: 'bg-fd-background text-fd-foreground shadow-sm',
-      false: 'text-fd-muted-foreground',
-    },
-  },
-});
-
-const full = [['light', Sun] as const, ['dark', Moon] as const, ['system', Airplay] as const];
-
-export function ThemeToggle({
-  className,
-  mode = 'light-dark',
-  ...props
-}: ComponentProps<'div'> & {
-  mode?: 'light-dark' | 'light-dark-system';
-}) {
+/**
+ * Single-icon theme toggle that visually pairs with the GitHub icon link.
+ *
+ * Click cycles: light → dark → system → light.
+ *
+ * - Explicit light → Sun
+ * - Explicit dark  → Moon
+ * - System         → Monitor with the resolved theme (Sun/Moon) shown at
+ *   half size centered inside it — the monitor "displays" the current OS
+ *   theme, signalling "OS controls this".
+ */
+export function ThemeToggle({ className, ...props }: ComponentProps<'button'>) {
   const { setTheme, theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
+  useEffect(() => setMounted(true), []);
 
-  useEffect(() => {
-    setMounted(true);
-  }, []);
+  const isSystem = mounted && theme === 'system';
+  const effective = mounted ? resolvedTheme : 'light';
+  const Resolved = effective === 'dark' ? Moon : Sun;
 
-  const container = cn(
-    'inline-flex items-center rounded-lg border border-fd-border bg-fd-muted p-1',
-    className,
-  );
+  const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
 
-  if (mode === 'light-dark') {
-    const value = mounted ? resolvedTheme : null;
-
-    return (
-      <button
-        className={container}
-        aria-label={`Toggle Theme`}
-        onClick={() => setTheme(value === 'light' ? 'dark' : 'light')}
-        data-theme-toggle=""
-      >
-        {full.map(([key, Icon]) => {
-          if (key === 'system') return;
-
-          return (
-            <Icon
-              key={key}
-              fill="currentColor"
-              className={cn(itemVariants({ active: value === key }))}
-            />
-          );
-        })}
-      </button>
-    );
-  }
-
-  const value = mounted ? theme : null;
+  // Title: full plain-language explanation on hover/focus
+  const currentLabel = !mounted
+    ? 'system'
+    : theme === 'system'
+      ? `system (currently ${effective})`
+      : (theme ?? 'system');
+  const title = `Theme: ${currentLabel} — click to switch to ${next}`;
 
   return (
-    <div className={container} data-theme-toggle="" {...props}>
-      {full.map(([key, Icon]) => (
-        <button
-          key={key}
-          aria-label={key}
-          className={cn(itemVariants({ active: value === key }))}
-          onClick={() => setTheme(key)}
-        >
-          <Icon className="size-full" fill="currentColor" />
-        </button>
-      ))}
-    </div>
+    <button
+      type="button"
+      title={title}
+      aria-label={title}
+      onClick={() => setTheme(next)}
+      className={cn(
+        buttonVariants({ size: 'icon-sm', color: 'ghost' }),
+        'relative text-fd-muted-foreground',
+        className,
+      )}
+      {...props}
+    >
+      {isSystem ? (
+        <span aria-hidden className="relative inline-flex items-center justify-center">
+          <Monitor className="size-4" />
+          <Resolved
+            // Resolved theme nested inside the monitor frame at half size.
+            // Slight upward nudge keeps it inside the screen, not the stand.
+            // `!size-2` is needed to beat the parent button's
+            // `[&_svg]:size-4` from buttonVariants.
+            className="absolute !size-2 -translate-y-px"
+            fill="currentColor"
+          />
+        </span>
+      ) : (
+        <Resolved className="size-4" />
+      )}
+    </button>
   );
 }

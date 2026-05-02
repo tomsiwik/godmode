@@ -1,6 +1,100 @@
 ---
 title: Discovery
-description: Nested --help walks you through every level of an extension.
+description: Use `--help` at every level to walk from the top of the CLI down to a single operation.
 ---
 
-> TODO: ladder from `godmode --help` → `godmode <ext> --help` → `godmode <ext> <iface> --help` → `godmode <ext> <iface> <resource> --help`. Show a real transcript for stripe. Mention that `--help` is parsed at every level regardless of position; `-h` too. Note that `godmode <ext> --version` shows spec versions.
+godmode is self-describing. There is no separate doc tree to memorize — `--help` works at every nesting level and prints exactly what's available at that scope. New extension? Run `--help`. Forgot a flag? Run `--help`.
+
+## The four-step ladder
+
+```sh
+godmode --help                                     # top level: built-ins + installed extensions
+godmode <extension> --help                         # the extension's interfaces, auth, version
+godmode <extension> <interface> --help             # methods, resources, options
+godmode <extension> <interface> <resource> --help  # operations on that resource
+```
+
+Each step narrows the scope. Output at each level only shows what's reachable from there — no noise from siblings.
+
+<Callout type="info">
+  `-h` is an accepted alias for `--help` everywhere. Both work at every level, in any position — `godmode --help stripe` and `godmode stripe --help` print the same page.
+</Callout>
+
+## A real walk-through
+
+Stripe, top to bottom:
+
+```sh
+$ godmode stripe --help
+stripe — Interact with Stripe (auth: STRIPE_API_KEY)
+
+Interfaces:
+  api       REST (OpenAPI v3)         spec: openapi.spec3.yaml @ 2024-12-18
+  mcp       Serve as MCP over stdio   derived from api
+
+Run godmode stripe <interface> --help for details.
+```
+
+```sh
+$ godmode stripe api --help
+stripe api — REST interface
+
+Resources:
+  accounts          Account management
+  balance           Balance retrieval
+  charges           Payment charges
+  customers         Customer records
+  invoices          Invoices and line items
+  ...               (108 resources total — pipe to less)
+
+Usage:
+  godmode stripe api <METHOD> <resource> [args...]
+
+Run godmode stripe api <resource> --help for operations.
+```
+
+```sh
+$ godmode stripe api customers --help
+stripe api customers — operations
+
+Methods:
+  GET     /v1/customers                List customers (paginated)
+  GET     /v1/customers/{id}           Retrieve a customer
+  POST    /v1/customers                Create a customer
+  POST    /v1/customers/{id}           Update a customer
+  DELETE  /v1/customers/{id}           Delete a customer
+
+Sub-resources:
+  customers balance_transactions
+  customers cash_balance
+  customers payment_methods
+  ...
+
+Examples:
+  godmode stripe api GET  customers limit==10
+  godmode stripe api POST customers email=a@b.com
+  godmode stripe api GET  customers cus_123
+```
+
+The same pattern works for any installed extension — `slack`, `openai`, `github graphql`, `context7 mcp`. Same four steps.
+
+## Versioning
+
+`--version` is parsed at the same levels and reports the spec version actually in use, not just godmode's:
+
+```sh
+$ godmode --version
+godmode 0.4.2
+
+$ godmode stripe --version
+stripe extension: cached spec from 2024-12-18 (api)
+godmode core: 0.4.2
+```
+
+Useful when an upstream API changes shape and you need to confirm whether your local cache is stale. Re-fetch with `godmode ext update <name>`.
+
+## What `--help` will not tell you
+
+- **Required env vars beyond auth.** Some extensions read additional env (region, account ID). Those are documented in the extension's README, not in `--help`.
+- **Permissions denials.** If a call is blocked by `settings.yaml`, `--help` still lists the resource — discovery is independent of policy. See [Permissions](/docs/permissions).
+- **Rate limits.** Upstream-specific. The extension passes them through verbatim in error messages.

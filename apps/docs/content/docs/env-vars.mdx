@@ -1,6 +1,68 @@
 ---
 title: Environment variables
-description: Where godmode reads credentials from.
+description: How godmode picks up auth tokens and configuration from your shell and `.env` files.
 ---
 
-> TODO: godmode auto-loads a `.env` from the current working directory at startup (no walking up); shell-exported env takes precedence. Worked example with `STRIPE_API_KEY`. Note no variable expansion, no `.env.local` layering.
+Every extension authenticates by reading an environment variable — `STRIPE_API_KEY`, `GITHUB_TOKEN`, `OPENAI_API_KEY`, and so on. The variable name comes from the extension's manifest and is shown by `godmode <ext> --help`. godmode resolves these from two places, in this order.
+
+## Resolution order
+
+1. **Shell-exported environment** — anything already in `process.env` when godmode starts.
+2. **`.env` in the current working directory** — loaded once at startup. Variables already set in the shell are **not overwritten**.
+
+That's it. There is no walking up the directory tree, no `.env.local` overlay, no variable interpolation, no namespacing.
+
+<Callout type="warn">
+  godmode reads `.env` from `process.cwd()` only. If you run godmode from `~/projects/foo/` but your `.env` lives in `~/projects/foo/api/`, godmode will not find it. Use shell-exported env or `cd` into the directory with the `.env`.
+</Callout>
+
+## A worked example
+
+```sh
+# ~/projects/checkout/.env
+STRIPE_API_KEY=sk_test_abc123
+```
+
+```sh
+$ cd ~/projects/checkout
+$ godmode stripe api GET customers limit==5
+# uses sk_test_abc123 from .env
+```
+
+```sh
+$ cd ~/projects/checkout
+$ STRIPE_API_KEY=sk_live_xyz godmode stripe api GET customers limit==5
+# shell-exported value wins; .env is ignored for STRIPE_API_KEY
+```
+
+```sh
+$ cd ~                              # no .env here
+$ godmode stripe api GET customers
+Blocked: STRIPE_API_KEY is not set. Set it in your shell or in a .env in the current directory.
+```
+
+## What's intentionally not supported
+
+| Feature | Status | Why |
+|---|---|---|
+| Walking up to parent dirs for `.env` | ❌ | Surprising at scale — agents in nested cwds would inherit secrets they didn't expect. |
+| `.env.local`, `.env.production`, etc. | ❌ | One file, one source of truth. Use shell env for environment-specific overrides. |
+| `${VAR}` interpolation inside `.env` | ❌ | Avoids shell-vs-godmode mismatches. Resolve before invoking. |
+| Per-extension namespacing (`STRIPE__API_KEY`) | ❌ | Extensions declare their own var; collisions are the user's call. |
+| Auto-export to subprocesses | ✅ | godmode forwards its env to spawned MCP servers and agent commands. |
+
+## Inspecting what godmode actually sees
+
+```sh
+godmode <ext> --help            # shows the env var the extension expects
+godmode --debug <ext> ...       # logs the request including which auth source was used
+```
+
+`GODMODE_DEBUG=1` does the same as `--debug` and persists for the shell session.
+
+## Common pitfalls
+
+- **Forgot to `cd` into the project.** Running `godmode stripe ...` from `~` won't pick up the project's `.env`. Either `cd` first, or `export` the var inline.
+- **Comments in `.env`.** Lines starting with `#` are ignored; trailing comments after a value are not. `KEY=value # comment` makes the value `value # comment`.
+- **Quotes in `.env`.** Surrounding quotes are stripped (`KEY="value"` → `value`), but quotes mid-value are preserved literally.
+- **Empty values count as set.** `STRIPE_API_KEY=` defines the var as the empty string, which fails auth with a clearer error than "unset". Delete the line to fall through to shell env.
