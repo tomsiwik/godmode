@@ -1,6 +1,6 @@
 {
   "name": "godmode",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "any API as CLI. any API as MCP. zero code generation.",
   "type": "module",
   "license": "MIT",
