@@ -1,6 +1,77 @@
 ---
 title: Multi-interface extensions
-description: Declare api + mcp (or any combination) in one manifest.
+description: Declare `api` + `graphql` + `mcp` (or any combination) in one manifest.
 ---
 
-> TODO: show a manifest with both `api:` and `mcp:` under `interfaces:`. The same extension can be invoked as `godmode <ext> api ...` or `godmode <ext> mcp ...`; `--help` lists both. Use cases and gotchas (auth shared across interfaces, different base URLs per interface).
+A single extension can expose more than one interface. Useful when an upstream offers both REST and GraphQL, or when you want to wrap an existing MCP server alongside its public REST surface.
+
+## Shape
+
+```yaml
+name: github
+description: GitHub APIs (REST + GraphQL)
+interfaces:
+  api:
+    spec: https://raw.githubusercontent.com/github/rest-api-description/main/descriptions/api.github.com/api.github.com.json
+    url:  https://api.github.com
+  graphql:
+    url:  https://api.github.com/graphql
+auth:
+  type: bearer
+  env:  GITHUB_TOKEN
+```
+
+Both interfaces are now first-class:
+
+```sh
+godmode github api      GET repos/torvalds/linux
+godmode github graphql  '{ viewer { login } }'
+```
+
+`godmode github --help` lists both interfaces. Each one has its own `--help` ladder.
+
+## Auth is shared
+
+The top-level `auth:` block applies to every interface. In the example above, both REST calls and GraphQL queries send `Authorization: Bearer $GITHUB_TOKEN`. This matches almost every real-world API — there's typically one credential serving both surfaces.
+
+If different interfaces need different credentials, the manifest can't express that. Workarounds:
+
+- **Split into two extensions** (`github-rest` and `github-graphql`), each with its own `auth:`.
+- **Use one interface and proxy the other upstream-side.**
+
+## Different base URLs per interface
+
+```yaml
+interfaces:
+  api:
+    spec: ...
+    url:  https://api.example.com
+  graphql:
+    url:  https://graphql.example.com     # different host
+```
+
+Each interface has its own `url`. Useful when upstream serves REST and GraphQL from separate hostnames (common for big platforms).
+
+## Common combinations
+
+| Combo | Why |
+|---|---|
+| `api` + `graphql` | Upstream offers both, users pick the one that fits their query shape. |
+| `api` + `mcp` | REST for traditional callers; MCP for richer agent-friendly tool definitions (where `--help` synthesis isn't enough). |
+| `graphql` + `mcp` | GraphQL for ad-hoc queries; MCP for predefined operations the agent should pick from. |
+
+## What you don't get
+
+- **Cross-interface dispatch.** `godmode github api` and `godmode github graphql` are separate dispatch chains — args from one don't auto-route to the other.
+- **Shared response caching.** Each interface caches its own spec/schema; same upstream, two caches.
+- **Combined permissions.** Permissions ([reference](/docs/permissions)) apply per interface; rules for `api` don't carry to `graphql`.
+
+## Derivative MCP serving
+
+If you only declare `api` or `graphql`, you still get MCP for free — `godmode <ext> mcp` synthesizes one. See [MCP serving](/developers/mcp-serving) for when to declare `mcp` explicitly vs rely on derivation.
+
+## See also
+
+- [Interface types](/developers/interface-types) — when to pick api / graphql / mcp.
+- [Manifest schema](/developers/manifest-schema) — full field reference for each interface.
+- [MCP serving](/developers/mcp-serving) — derivative MCP from a non-MCP interface.

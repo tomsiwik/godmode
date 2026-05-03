@@ -1,6 +1,102 @@
 ---
 title: Publishing
-description: Ship an extension as @godmode-cli/<slug> on npm.
+description: Ship an extension to npm so anyone can `godmode ext install <slug>`.
 ---
 
-> TODO: package layout (`package.json` with `name`, `exports: { "./manifest": "./manifest.yaml" }`, `files: ["manifest.yaml", "README.md", "LICENSE"]`). `npm publish`. Then anyone can `godmode ext install <slug>`.
+A godmode extension becomes installable when it's published as an npm package with a `manifest.yaml` exposed via the package's `exports` map. No central registry — npm IS the registry.
+
+## Package layout
+
+```
+my-extension/
+├── package.json
+├── manifest.yaml
+├── README.md
+└── LICENSE
+```
+
+That's the whole thing. No build step, no JS, no TypeScript — unless you're shipping a [package-based extension](/developers/interface-types#package-based-mcp) with its own MCP server implementation.
+
+## `package.json` shape
+
+```json
+{
+  "name": "@yourscope/godmode-stripe",
+  "version": "0.1.0",
+  "description": "Stripe API as a godmode extension",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourscope/godmode-stripe"
+  },
+  "exports": {
+    "./manifest": "./manifest.yaml"
+  },
+  "files": [
+    "manifest.yaml",
+    "README.md",
+    "LICENSE"
+  ],
+  "keywords": ["godmode", "godmode-extension", "stripe"]
+}
+```
+
+Three things godmode looks at:
+
+| Field | Why |
+|---|---|
+| `exports."./manifest"` | How `godmode ext install` finds the manifest. **Required.** |
+| `files` | What npm packs into the tarball. Keep it minimal — no node_modules, no source code, no build artifacts. |
+| `keywords: ["godmode-extension"]` | How extension catalogs/search tools discover your package. Recommended. |
+
+## Publish
+
+```sh
+npm publish --access=public      # for scoped packages on the public registry
+```
+
+That's it. Test the install path immediately:
+
+```sh
+godmode ext install @yourscope/godmode-stripe
+godmode stripe --help
+```
+
+## Slug resolution
+
+When users run `godmode ext install <name>`, the resolution order is:
+
+1. **Local folder path** (starts with `.` or `/`) → reads `manifest.yaml` from disk.
+2. **Scoped npm package** (`@scope/name`) → installs as-is.
+3. **Bare slug** (`stripe`) → resolves to `@godmode-cli/stripe`.
+
+So `godmode ext install stripe` only finds *your* extension if you publish under the reserved `@godmode-cli` namespace (first-party). For everyone else, use a scope.
+
+## Versioning
+
+Extensions follow semver. Bump rules we recommend:
+
+| Change | Bump |
+|---|---|
+| Pointed `spec:` at a new upstream URL | major |
+| New manifest field used | minor (older godmode CLIs will warn) |
+| Description tweak, README update, no behavior change | patch |
+| Auth type change (`bearer` → `api-key`) | major — env var name probably changes too |
+
+godmode CLI itself does not pin extensions to a specific version; it always installs the latest matching the user's range. If you ship a breaking change, bump major and document the migration in your README.
+
+## Ship the skill alongside (optional)
+
+If you also want to publish a [godmode skill](https://skills.sh) so agent harnesses can install service-specific guidance, place a `skills/godmode-<slug>/SKILL.md` in the same git repo. Users run:
+
+```sh
+npx skills add yourscope/godmode-stripe
+```
+
+…to install the skill into Claude Code, Cursor, Codex, etc. Independent of `npm publish` — Vercel's skills CLI walks the GitHub repo directly.
+
+## See also
+
+- **[Submit an extension](/extensions/submit)** — naming conventions, reserved slugs, getting into `@godmode-cli/*`.
+- **[Local development](/developers/local-development)** — iterate before publishing.
+- **[Manifest schema](/developers/manifest-schema)** — every field reference.

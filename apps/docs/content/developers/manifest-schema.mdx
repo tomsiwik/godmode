@@ -1,6 +1,136 @@
 ---
 title: Manifest schema
-description: The canonical shape of manifest.yaml.
+description: Every field that goes in `manifest.yaml`, with type and intent.
 ---
 
-> TODO: render the JSON Schema at `packages/cli/schemas/manifest.schema.json` as a table. Top-level keys (`name`, `slug`, `description`, `interfaces`, `auth`, `headers`), interface-specific nested configs, examples per interface type.
+Source of truth: [`packages/cli/schemas/manifest.schema.json`](https://github.com/tomsiwik/godmode/blob/main/packages/cli/schemas/manifest.schema.json) (JSON Schema draft 2020-12). This page renders it as tables.
+
+## Top-level
+
+```yaml
+name:           # human-readable
+slug:           # CLI argument; defaults to lowercased name
+description:    # one-line summary
+interfaces:     # at least one of api / graphql / mcp
+auth:           # optional, shared across all interfaces
+headers:        # optional, sent with every request
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `name` | string | ✅ | Display name. Shown in `--help` headings. |
+| `slug` | string | — | URL-safe id. Pattern: `^[a-z0-9][a-z0-9-]*$`. Defaults to lowercased `name`. |
+| `description` | string | — | One-line summary. Shown in `godmode --help` extension listing. |
+| `interfaces` | object | ✅ | Map of interface name → config. At least one of `api`, `graphql`, `mcp`. |
+| `auth` | object | — | See [Auth types](/developers/auth-types). |
+| `headers` | `{string: string}` | — | Default headers for every request. Auth headers don't go here. |
+
+## `interfaces.api`
+
+```yaml
+interfaces:
+  api:
+    spec:     https://example.com/openapi.yaml   # or local path
+    url:      https://api.example.com            # base URL (optional if in spec.servers)
+    prefix:   /v2                                # path prefix override
+    versions: [...]                              # optional version pins
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `spec` | string | ✅ | URL or path to an OpenAPI 3.x document (YAML or JSON). |
+| `url` | string (URI) | — | Base URL. Falls back to `spec.servers[0].url`. |
+| `prefix` | string | — | Override path prefix. E.g. `/v1` if the spec doesn't include it. |
+| `versions` | array | — | List of versioned spec sources for multi-version support. |
+
+## `interfaces.graphql`
+
+```yaml
+interfaces:
+  graphql:
+    spec: ./schema.graphql           # one of spec OR url required
+    url:  https://api.example.com/graphql
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `spec` | string | one of | Path to a GraphQL SDL (.graphql) file. |
+| `url` | string (URI) | one of | Endpoint to introspect at install time. |
+
+You need either `spec` or `url`. With `url` only, godmode introspects on install and caches the schema.
+
+## `interfaces.mcp`
+
+```yaml
+interfaces:
+  mcp:
+    url:  https://example.com/mcp        # for HTTP-based MCP servers
+    # OR for stdio:
+    command: node
+    args: ["dist/server.js"]
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `url` | string (URI) | one of | HTTP MCP endpoint. |
+| `command` | string | one of | Executable to spawn for stdio transport. |
+| `args` | array of string | — | Arguments to the spawned command. |
+| `env` | `{string: string}` | — | Env passed to the spawned process. |
+
+Required: either `url` (HTTP) **or** `command` (stdio).
+
+## `auth`
+
+```yaml
+auth:
+  type:   bearer | api-key | basic
+  env:    NAME_OF_ENV_VAR
+  header: X-Custom-Header           # only when type=api-key
+```
+
+| Field | Type | Required | Notes |
+|---|---|---|---|
+| `type` | enum | ✅ | One of `bearer`, `api-key`, `basic`. See [Auth types](/developers/auth-types). |
+| `env` | string | ✅ | Env var name to read the credential from. |
+| `header` | string | for `api-key` | Custom header name. Default: `X-Api-Key`. |
+
+If `auth` is omitted entirely, the extension is treated as unauthenticated. See `extensions/petstore/manifest.yaml` for an example.
+
+## `headers`
+
+```yaml
+headers:
+  X-Client-ID:   godmode
+  X-Telemetry:   off
+```
+
+Static headers added to every request. Use this for upstream-required identification headers (not for auth — that goes in `auth:`).
+
+## Full example
+
+```yaml
+name: stripe
+slug: stripe                      # optional; would default to "stripe" anyway
+description: Stripe payments API
+interfaces:
+  api:
+    spec: https://raw.githubusercontent.com/stripe/openapi/refs/heads/master/latest/openapi.spec3.yaml
+    url:  https://api.stripe.com
+auth:
+  type: bearer
+  env:  STRIPE_API_KEY
+headers:
+  Stripe-Version: '2024-12-18'
+```
+
+## Validation
+
+The CLI validates every manifest against the schema on `ext install` / `ext update`. Errors look like:
+
+```
+ext install ./my-ext failed:
+  manifest.yaml /interfaces: must NOT have additional properties
+    additionalProperty: "rest"     ← did you mean "api"?
+```
+
+You can validate ahead of time with any JSON Schema validator pointed at the schema URL above.

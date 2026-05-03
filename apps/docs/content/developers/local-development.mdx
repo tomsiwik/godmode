@@ -1,6 +1,82 @@
 ---
 title: Local development
-description: Iterate on a manifest without publishing.
+description: Iterate on a manifest without publishing to npm.
 ---
 
-> TODO: `godmode ext install ./folder` reads from disk; edit manifest → `godmode ext update <slug>` picks it up. Note cache location `~/.godmode/apis/<slug>.json`. Show the workflow for debugging a bad spec.
+When you're authoring an extension, you don't want to `npm publish` after every edit. godmode reads manifests directly off disk — install once from a folder, edit freely, run `update` to re-parse.
+
+## The inner loop
+
+```sh
+godmode ext install ./my-extension       # install from a folder
+godmode my-ext --help                    # confirm registration
+# ... edit manifest.yaml ...
+godmode ext update my-ext                # re-fetch spec, rebuild cache
+godmode my-ext api GET resource          # try the change
+```
+
+`update` re-runs the install pipeline against the on-disk manifest. The folder path is remembered, so you don't have to re-pass it.
+
+## Where the cache lives
+
+| Path | Contents |
+|---|---|
+| `~/.godmode/extensions/<slug>.json` | Parsed manifest + spec, ready for dispatch |
+| `~/.godmode/node_modules/` | Package-based extensions installed via npm name |
+| `<project>/.godmode/extensions/` | Per-project overlay — installs here when run inside a project |
+
+Project-scoped installs win over global. Useful for "this codebase needs Stripe but my home doesn't".
+
+## Debugging a bad spec
+
+If `ext install` or `ext update` fails:
+
+```sh
+godmode --debug ext install ./my-extension
+```
+
+`--debug` (or `GODMODE_DEBUG=1`) prints:
+
+- The exact URL fetched for the spec
+- The parser's interpretation (resource map, route count, auth resolution)
+- Any validation errors with file/line references
+
+Common failures and what they mean:
+
+| Symptom | Likely cause |
+|---|---|
+| `Failed to fetch spec: ENOTFOUND` | Spec URL wrong or unreachable |
+| `Spec is not valid OpenAPI 3.x` | The file at `spec:` is OpenAPI 2 / Swagger 2 — convert with `swagger2openapi` |
+| `No interfaces declared` | Forgot the `interfaces:` block, or its contents are empty |
+| `Resource map is empty` | Spec has no `paths:` entries, or all paths are templated with no concrete resources |
+| `--help shows fewer routes than expected` | Some routes have no `operationId` — godmode synthesizes one from method + path; check the upstream spec |
+
+## Editing the spec itself
+
+If you control the OpenAPI spec, you can point `spec:` at a local file path during development:
+
+```yaml
+# manifest.yaml
+interfaces:
+  api:
+    spec: ./openapi.local.yaml         # relative to the manifest
+    url: https://api.example.com
+```
+
+Then it's a single edit-and-update cycle. Switch back to a remote URL when you're ready to publish.
+
+## Hot-tip: `--dry-run`
+
+Most write methods support `--dry-run` (it appends `?dry-run=true` or sets a header per the upstream's convention) so you can see the formed request without actually firing it:
+
+```sh
+godmode my-ext api POST things name=test --dry-run
+```
+
+Not all upstreams honor this — godmode just adds the marker and shows you the curl-equivalent it would have sent.
+
+## See also
+
+- **[Quickstart](/developers/quickstart)** — first manifest from scratch.
+- **[Manifest schema](/developers/manifest-schema)** — every field reference.
+- **[Publishing](/developers/publishing)** — when you're ready to ship.

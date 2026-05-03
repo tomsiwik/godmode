@@ -1,6 +1,80 @@
 ---
 title: Repo setup
-description: Clone, install, build, link.
+description: Clone the godmode monorepo, install, build, and link a dev binary.
 ---
 
-> TODO: `git clone`, `pnpm install`, `pnpm -C packages/cli build`, `pnpm -C packages/cli link --global` for a linked dev binary. Monorepo layout (packages, commands, interfaces, extensions).
+For contributing to godmode itself (the CLI, interfaces, first-party extensions). If you just want to *use* an extension you've written locally, see [Local development](/developers/local-development) — you don't need to clone this repo.
+
+## Clone & install
+
+```sh
+git clone https://github.com/tomsiwik/godmode.git
+cd godmode
+pnpm install
+```
+
+[pnpm 10+](https://pnpm.io) is required (workspace + lockfile features). Node 20+.
+
+## Build the CLI
+
+```sh
+pnpm -C packages/cli build
+```
+
+Output lands in `packages/cli/dist/`. The CLI's binary entry is `packages/cli/dist/index.js`.
+
+## Link a dev binary
+
+```sh
+pnpm -C packages/cli link --global
+```
+
+Now `godmode` on your `$PATH` resolves to the working-tree build. Edit `packages/cli/src/`, rebuild, and the next invocation runs your changes — no reinstall needed.
+
+To unlink and revert to whatever was on `$PATH` before:
+
+```sh
+pnpm -C packages/cli unlink --global
+```
+
+## Watch mode (recommended)
+
+```sh
+pnpm dev
+```
+
+Top-level `dev` runs `turbo dev` across the workspace — all packages rebuild on save. Combined with the global link, you get edit → save → run-godmode-from-anywhere with no manual rebuild.
+
+## Monorepo layout
+
+```
+packages/
+  cli/                    # godmode binary; dispatch, parser, help system
+  test/                   # @godmode-cli/test — shared test utils
+  ui/                     # @godmode-cli/ui — UI components for the docs site
+  cli-tools/              # internal tools used by CLI dev workflows
+interfaces/
+  api/                    # @godmode-cli/interface-api — REST execution
+  graphql/                # @godmode-cli/interface-graphql — GraphQL execution
+  mcp/                    # @godmode-cli/interface-mcp — MCP wrapping
+commands/
+  agent/                  # @godmode-cli/command-agent — built-in `agent` extension
+extensions/
+  stripe/  github/  slack/  openai/  context7/  petstore/  claude-code-channels/
+apps/
+  docs/                   # documentation site (TanStack Start + fumadocs)
+skills/
+  godmode/                # the godmode skill (npx skills add tomsiwik/godmode)
+```
+
+Conventions:
+
+- **One folder per package**, even for tiny ones. Workspace ranges (`workspace:*`) link them.
+- **Extensions use `manifest.yaml` only** — no runtime code unless they're MCP package-based extensions.
+- **Tests live alongside the package** under `<pkg>/test/`. Run a single package's tests with `pnpm -C <pkg> test`.
+
+## See also
+
+- **[Local development](/developers/local-development)** — iterate on YOUR extension without cloning godmode.
+- **[Testing](/developers/testing)** — what `pnpm -r test` covers and the help-compliance pipeline.
+- **[PR workflow](/developers/pr-workflow)** — how to land a change.

@@ -1,6 +1,114 @@
 ---
 title: Interface types
-description: When to pick api, graphql, or mcp.
+description: When to pick `api`, `graphql`, or `mcp` for your extension.
 ---
 
-> TODO: side-by-side comparison. `api` for OpenAPI-described REST services. `graphql` for SDL or introspected endpoints. `mcp` for MCP servers (stdio or HTTP). Decision tree: "do you have an OpenAPI spec?" → api, etc. Link to each extension as a live example.
+Every extension declares one or more interfaces. The interface dictates how godmode dispatches calls and what `--help` looks like at the inner levels.
+
+## At a glance
+
+| Interface | Source of truth | Best for | Live example |
+|---|---|---|---|
+| **`api`** | OpenAPI 3.x spec | REST APIs (most third-party services) | [stripe](/extensions/stripe), [openai](/extensions/openai), [slack](/extensions/slack), [petstore](/extensions/petstore) |
+| **`graphql`** | SDL file or introspectable endpoint | GraphQL APIs | [github](/extensions/github) |
+| **`mcp`** | MCP server (stdio or HTTP) | Existing MCP servers, custom tooling | [context7](/extensions/context7), [claude-code-channels](/extensions/claude-code-channels) |
+
+## Decision tree
+
+```
+Does the upstream publish an OpenAPI 3.x spec?
+├── Yes → api
+└── No
+    ├── Is it GraphQL?
+    │   ├── Yes → graphql
+    │   └── No
+    └── Is there already an MCP server for it?
+        ├── Yes → mcp (point at the existing server)
+        └── No → write your own MCP server in a package, declare type=mcp,
+                 OR file a feature request upstream for an OpenAPI spec
+```
+
+## `api` (REST)
+
+Routes derived from an OpenAPI 3.x document. godmode parses paths, methods, parameters, and request/response shapes — `--help` shows them all.
+
+```yaml
+interfaces:
+  api:
+    spec: https://example.com/openapi.yaml
+    url:  https://api.example.com
+```
+
+**Strengths:** zero runtime code, automatic parameter validation, `--help` doubles as API documentation.
+
+**Limits:** only as good as the upstream spec. Missing `operationId`s, vague descriptions, or missing examples mean less helpful `--help` output. (godmode synthesizes operationIds from method+path when missing.)
+
+## `graphql`
+
+Either a local SDL file or an introspectable endpoint.
+
+```yaml
+# SDL-based
+interfaces:
+  graphql:
+    spec: ./schema.graphql
+
+# Introspection-based
+interfaces:
+  graphql:
+    url: https://api.github.com/graphql
+```
+
+**Strengths:** schema awareness; users can ask `--help` for a type or field. Single endpoint, no per-route parsing.
+
+**Limits:** introspection requires network access at install time and may be disabled for private GraphQL APIs (you'll need to ship the SDL with the package).
+
+## `mcp` (Model Context Protocol)
+
+For wrapping existing MCP servers, or for cases where the upstream tool surface is best modeled as MCP tools (not REST routes).
+
+### Spec-based (HTTP MCP server)
+
+```yaml
+interfaces:
+  mcp:
+    url: https://example.com/mcp
+```
+
+godmode connects over HTTP, lists tools, exposes them as `godmode <ext> mcp <tool>` invocations.
+
+### Package-based (stdio MCP server)
+
+For when the MCP server is itself a binary or script you ship in the same npm package:
+
+```yaml
+interfaces:
+  mcp:
+    command: node
+    args: ["dist/server.js"]
+```
+
+The package's `package.json` ships the binary; godmode spawns it on demand. See [`extensions/claude-code-channels`](/extensions/claude-code-channels) for a complete example.
+
+## Multiple interfaces
+
+You can declare more than one — useful when an API has both an OpenAPI spec and a richer MCP wrapper:
+
+```yaml
+interfaces:
+  api:    { spec: ... }
+  mcp:    { command: node, args: [...] }
+```
+
+Then both `godmode myext api ...` and `godmode myext mcp ...` work. See [Multi-interface extensions](/developers/multi-interface).
+
+## Derivative MCP serving
+
+Even an `api`-only or `graphql`-only extension can be served as an MCP server *without* declaring `mcp:` — `godmode <ext> mcp` synthesizes one. See [MCP serving](/developers/mcp-serving) for how the synthesis works.
+
+## See also
+
+- [Manifest schema](/developers/manifest-schema) — every field reference.
+- [Auth types](/developers/auth-types) — authentication is interface-agnostic.
+- [MCP serving](/developers/mcp-serving) — derivative MCP from non-MCP interfaces.
+- [Multi-interface extensions](/developers/multi-interface) — declaring more than one in one manifest.

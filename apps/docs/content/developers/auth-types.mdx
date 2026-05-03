@@ -1,6 +1,124 @@
 ---
 title: Auth types
-description: bearer, api-key, basic — canonical reference.
+description: Canonical reference for the three credential shapes godmode understands.
 ---
 
-> TODO: this is the single source of truth for auth types (Usage → Auth types links here). Full table with HTTP header, curl equivalent, and a concrete example manifest per type. Cover `auth.env`, `auth.type`, `auth.header` (api-key), and how `basic` expects the env var to already be base64-encoded.
+Source of truth for authentication. The user-facing summary is at [Authentication](/docs/auth-types) — this page is the developer reference linked from the schema.
+
+## The three types
+
+```yaml
+auth:
+  type: bearer | api-key | basic
+  env:  NAME_OF_ENV_VAR
+  header: X-Custom-Header        # only when type: api-key
+```
+
+| Type      | Header sent                              | Env var holds                          | Curl equivalent |
+|-----------|------------------------------------------|----------------------------------------|---|
+| `bearer`  | `Authorization: Bearer <env>`            | The raw token                          | `curl -H "Authorization: Bearer $TOKEN"` |
+| `api-key` | `<custom-header>: <env>`                 | The raw key                            | `curl -H "X-Custom-Header: $KEY"` |
+| `basic`   | `Authorization: Basic <env>`             | A **pre-encoded** `user:pass` (base64) | `curl -u user:pass` (curl encodes for you; godmode does not) |
+
+## `bearer` — most common
+
+```yaml
+auth:
+  type: bearer
+  env:  STRIPE_API_KEY
+```
+
+```sh
+export STRIPE_API_KEY=sk_test_abc
+godmode stripe api GET customers
+# → Authorization: Bearer sk_test_abc
+```
+
+Used by Stripe, OpenAI, and most modern REST APIs. The env var holds the raw token; godmode prepends `Bearer `.
+
+## `api-key` — custom header
+
+```yaml
+auth:
+  type:   api-key
+  env:    ACME_API_KEY
+  header: X-Acme-Api-Key       # required for api-key
+```
+
+```sh
+export ACME_API_KEY=ak_live_xyz
+godmode acme api GET widgets
+# → X-Acme-Api-Key: ak_live_xyz
+```
+
+Use this when the upstream wants the credential in a custom header (not `Authorization`). The `header` field is **required** for `api-key` — there's no sensible default.
+
+If the upstream uses `Authorization: <something other than Bearer>`, that's still `api-key` with `header: Authorization`:
+
+```yaml
+auth:
+  type:   api-key
+  env:    LEGACY_TOKEN
+  header: Authorization        # for non-bearer Authorization schemes
+```
+
+## `basic` — pre-encoded only
+
+```yaml
+auth:
+  type: basic
+  env:  LEGACY_AUTH
+```
+
+```sh
+# YOU encode it; godmode does not
+export LEGACY_AUTH=$(printf 'user:pass' | base64)
+godmode legacy api GET things
+# → Authorization: Basic dXNlcjpwYXNz
+```
+
+<Callout type="warn">
+  godmode does **not** base64-encode for you. The env var must contain the encoded `user:pass`. This is intentional — it avoids double-encoding when the credential is already stored encoded in a secret manager (which is the common case for `basic`).
+</Callout>
+
+If you want godmode to encode for you, do it inline: `LEGACY_AUTH=$(printf 'user:pass' | base64) godmode ...`.
+
+## Per-interface auth
+
+Auth is declared at the manifest top level — it applies to every interface declared (`api`, `graphql`, `mcp`):
+
+```yaml
+auth:
+  type: bearer
+  env:  GITHUB_TOKEN
+interfaces:
+  api:     { spec: ... }
+  graphql: { url: https://api.github.com/graphql }
+```
+
+Both `godmode github api ...` and `godmode github graphql ...` will send `Authorization: Bearer $GITHUB_TOKEN`.
+
+If different interfaces need different credentials, you can't express that in one manifest — split into two extensions, or use a single interface with an upstream that forwards.
+
+## Missing credentials — the error
+
+```
+$ godmode stripe api GET customers
+Blocked: STRIPE_API_KEY is not set. Set it in your shell or in a .env in the current directory.
+  --> missing bearer credentials for stripe
+```
+
+The trailing `--> missing <type> credentials for <slug>` line is consistent across all three types — useful for grepping CI logs.
+
+## Authoring tips
+
+- **Pick `env` names matching upstream conventions.** `STRIPE_API_KEY` is what Stripe's docs use; `OPENAI_API_KEY` matches OpenAI. Users have these in their shell already.
+- **Document the env name in the README.** `--help` shows it, but most users land on the README first.
+- **Don't bake auth into `headers:`.** Use the `auth:` block — it integrates with godmode's "missing credentials" detection and would otherwise log keys to stderr in `--debug`.
+- **Pre-encode `basic` in your secret manager.** Don't ship a runtime `printf … | base64` — it leaks the raw `user:pass` into shell history.
+
+## See also
+
+- [Authentication (user-facing)](/docs/auth-types) — three-line summary linked from the docs sidebar.
+- [Environment variables](/docs/env-vars) — how env vars get resolved at invocation time.
+- [Manifest schema](/developers/manifest-schema) — full schema for the `auth:` block.

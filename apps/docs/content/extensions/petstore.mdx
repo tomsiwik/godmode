@@ -1,6 +1,56 @@
 ---
 title: Petstore
-description: Sample Pet Store API — no auth needed, good for smoke-testing.
+description: The Swagger Pet Store API — no auth, public, perfect for your first godmode call.
 ---
 
-> TODO: auto-generate most of this from `extensions/petstore/manifest.yaml` + `godmode petstore --help`. Hand-written: "good first call with no auth" framing.
+The Pet Store extension wraps [petstore3.swagger.io](https://petstore3.swagger.io) — the canonical OpenAPI sample server. **No API key required**, public sandbox data, low stakes. Use it to confirm godmode is installed and working before pointing at a real API.
+
+## Install
+
+```sh
+godmode ext install petstore
+```
+
+## Manifest
+
+Two-line manifest, no auth block — that's the whole thing:
+
+```yaml
+name: petstore
+description: Sample Pet Store API
+interfaces:
+  api:
+    spec: https://petstore3.swagger.io/api/v3/openapi.json
+    url: https://petstore3.swagger.io/api/v3
+```
+
+## Your first call
+
+```sh
+godmode petstore api --help                      # see what's available
+godmode petstore api GET pet 10                  # fetch pet by id
+godmode petstore api POST pet name=fido status=available
+godmode petstore api GET pet status==available   # ?status=available
+godmode petstore api DELETE pet 10
+```
+
+The Pet Store API resets its state periodically and accepts pretty much anything — you can POST garbage, mutate, delete, retry, without hurting anyone.
+
+## Why use this
+
+- **First-time install verification.** If `godmode petstore api GET pet 1` returns JSON, godmode is wired correctly. If it doesn't, the problem is install, not your real API's auth/networking.
+- **Demo / screencasts.** Public, deterministic, no secrets to redact.
+- **Permission policy testing.** Try writing a [`settings.yaml`](/docs/permissions) that allows `pet` reads but denies writes, then watch godmode block your DELETE before it hits the network.
+
+## Reference
+
+For the full route catalog, run:
+
+```sh
+godmode petstore api --help
+godmode petstore api pet --help
+godmode petstore api store --help
+godmode petstore api user --help
+```
+
+The catalog comes straight from the upstream OpenAPI spec — godmode doesn't curate it.

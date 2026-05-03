@@ -1,6 +1,45 @@
 ---
 title: Submit an extension
-description: Contribute an extension to the catalog.
+description: Publish your extension to npm — godmode auto-resolves it from there.
 ---
 
-> TODO: short page that links to `developers/authoring/publishing` and the contribution guidelines. Explain the reserved slugs (`ext`, `agent`) and the naming convention `@godmode-cli/<slug>`.
+godmode extensions are just npm packages with a `manifest.yaml`. There's no central registry to PR into. Publish to npm, and the world can `godmode ext install <slug>`.
+
+## In 90 seconds
+
+1. **Build it locally.** Follow the [Quickstart](/developers/quickstart) — minimal manifest, install from a folder, fire a request.
+2. **Package it.** See the [Publishing guide](/developers/publishing) for the `package.json` shape (`exports."./manifest"`, `files: ["manifest.yaml", ...]`).
+3. **`npm publish`.** Done. Anyone can `godmode ext install @yourscope/yourext`.
+
+## Naming
+
+| Convention | Example |
+|---|---|
+| **Scoped (recommended)** | `@yourscope/godmode-stripe` or any `@scope/anything` |
+| **Bare slug** *(first-party only)* | `stripe`, `github`, `slack` — resolves to `@godmode-cli/<slug>` on npm |
+
+Bare slugs (e.g. `godmode ext install stripe`) resolve to `@godmode-cli/<slug>`. The `@godmode-cli/` namespace is reserved for first-party extensions in the [godmode monorepo](https://github.com/tomsiwik/godmode); we accept community PRs for high-quality wrappers.
+
+## Reserved slugs
+
+Two extension slugs are reserved by the CLI itself — you can't shadow them:
+
+- **`ext`** — the extension manager (`godmode ext install`, `godmode ext list`, ...)
+- **`agent`** — the [built-in agent extension](/docs/agent)
+
+Picking either as a slug will cause `godmode ext install` to refuse with a clear error.
+
+## Quality bar (for `@godmode-cli/*`)
+
+If you want your extension considered for the first-party namespace, open a PR against [tomsiwik/godmode](https://github.com/tomsiwik/godmode) with:
+
+- `manifest.yaml` validated against [the schema](/developers/manifest-schema)
+- Tests under `extensions/<slug>/test/` covering at least one route per interface
+- A `README.md` linking to upstream API docs and listing known gotchas
+- Compliance pass: `pnpm -r test` clean, `--help` output renders without warnings
+
+See [PR workflow](/developers/pr-workflow) for branch naming, commit conventions, and what reviewers look for.
+
+## Skill alongside (optional)
+
+If your extension benefits from idiomatic-pattern guidance for agents, add a sibling skill at `skills/godmode-<slug>/SKILL.md`. It'll be installable via `npx skills add <your-repo> --skill godmode-<slug>` for any agent harness. See [the godmode skill](https://github.com/tomsiwik/godmode/tree/main/skills/godmode) for shape.

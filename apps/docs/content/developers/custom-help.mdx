@@ -1,6 +1,83 @@
 ---
-title: Custom help (preview)
-description: Subclass HelpPage to inject or rewrite sections for your extension.
+title: Custom help
+description: Inject extension-specific sections into the `--help` output.
 ---
 
-> TODO: the `HelpPage` class hierarchy (`RootHelp`, `ExtensionOverview`, `InterfaceHelp`). Example: `StripeHelp extends InterfaceHelp` adding a "curl equivalents:" section. Mark as preview — the manifest-driven loader (`help: ./help.js`) isn't wired yet.
+<Callout type="warn">
+  **Preview.** The `HelpPage` class hierarchy is stable internally, but the manifest-driven loader (`help: ./help.js`) isn't wired up yet. For now, custom help is only available to first-party extensions inside the godmode monorepo. The public API will likely change.
+</Callout>
+
+Most extensions are well-served by the auto-generated `--help` derived from their manifest and spec. When you need something more — curl equivalents, prerequisite warnings, idiomatic patterns — subclass the help renderer.
+
+## The class hierarchy
+
+```
+HelpPage                      # base class: header, usage, options, footer
+├── RootHelp                  # `godmode --help`
+├── ExtensionOverview         # `godmode <ext> --help`
+└── InterfaceHelp             # `godmode <ext> <iface> --help`
+    ├── ApiInterfaceHelp
+    ├── GraphqlInterfaceHelp
+    └── McpInterfaceHelp
+```
+
+Each level is a class with overridable section methods (`renderUsage`, `renderResources`, `renderExamples`, `renderFooter`). Subclass at the level where you need to inject content.
+
+## Worked example: curl equivalents for Stripe
+
+```ts
+// extensions/stripe/help.ts
+import { ApiInterfaceHelp } from '@godmode-cli/cli/help';
+
+export class StripeApiHelp extends ApiInterfaceHelp {
+  renderExamples() {
+    const base = super.renderExamples();   // keep godmode examples
+    return `${base}
+
+curl equivalents:
+  GET    customers cus_123        →  curl https://api.stripe.com/v1/customers/cus_123 -u $STRIPE_API_KEY:
+  POST   customers email=a@b.com  →  curl https://api.stripe.com/v1/customers -u $STRIPE_API_KEY: -d email=a@b.com`;
+  }
+}
+```
+
+Then in the manifest:
+
+```yaml
+# manifest.yaml — NOT YET WIRED, preview only
+help: ./help.js
+```
+
+When wired (planned for v0.5+), godmode loads `help.js`, picks the right class for the current help level, and invokes it instead of the default.
+
+## Until the loader lands
+
+For first-party extensions, hand-register in `packages/cli/src/help-registry.ts`:
+
+```ts
+import { StripeApiHelp } from '../../extensions/stripe/help';
+helpRegistry.register('stripe', { api: StripeApiHelp });
+```
+
+External packages can't do this yet without forking the CLI. If you have a strong use case for custom help in a third-party extension, [open an issue](https://github.com/tomsiwik/godmode/issues) — it'll prioritize the loader.
+
+## What custom help is good for
+
+| Use case | Pattern |
+|---|---|
+| Curl equivalents next to godmode commands | Override `renderExamples` |
+| Prerequisite warnings (e.g. "needs a Stripe Connect account") | Override `renderHeader` or add a section before usage |
+| Idiomatic call sequences (e.g. "always create customer before charge") | Add a "Common workflows" section |
+| Linking to upstream rate limits / quotas | Override `renderFooter` |
+
+## What it's NOT for
+
+- **Replacing the auto-generated route catalog** — that's the source of truth, hand-edits drift.
+- **Hiding routes you don't want users to see** — use [permissions](/docs/permissions) for that.
+- **Per-call documentation** — that lives in the OpenAPI spec, not in the help renderer.
+
+## See also
+
+- [Manifest schema](/developers/manifest-schema) — for when `help:` is wired, the field is reserved.
+- [Discovery](/docs/discovery) — the user-facing `--help` ladder behavior.
+- [GitHub issues](https://github.com/tomsiwik/godmode/issues) — track the loader work or request prioritization.

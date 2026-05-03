@@ -1,6 +1,103 @@
 ---
 title: MCP serving
-description: Serve any extension as an MCP server, even api/graphql ones.
+description: Serve any extension as an MCP server — `api`/`graphql` get one for free.
 ---
 
-> TODO: `godmode <ext> mcp` with no tool starts an MCP server over stdio, regardless of the extension's primary interface. How routes become tools, how params map, when to declare `mcp` explicitly in the manifest vs relying on derivative serving.
+`godmode <ext> mcp` always serves an MCP server over stdio, regardless of what interface(s) the extension declared. If the manifest has `interfaces.mcp`, godmode forwards to it; if it doesn't, godmode synthesizes one from whatever else is declared. **Every extension is an MCP server.**
+
+## How synthesis works
+
+For an `api`-only extension, godmode walks the OpenAPI spec and emits one MCP tool per route:
+
+| OpenAPI element | Becomes MCP element |
+|---|---|
+| `/v1/customers/{id}` (GET) | tool `get_customers_id` |
+| `operationId: createCharge` | tool `create_charge` (operationId wins when present) |
+| Path param `{id}` | required string param |
+| Query param `?limit=10` | optional integer param (matches schema type) |
+| Request body schema | required object param `body` |
+| Response schema | tool description + structured output |
+
+For `graphql`, each named operation in the SDL becomes a tool; ad-hoc queries are exposed as a single `query` tool taking a string.
+
+## Worked example
+
+```sh
+# Stripe is api-only:
+$ cat extensions/stripe/manifest.yaml
+name: stripe
+interfaces:
+  api: { spec: ..., url: https://api.stripe.com }
+
+# But MCP works:
+$ godmode stripe mcp &     # serves over stdio
+$ echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | godmode stripe mcp
+{
+  "tools": [
+    { "name": "get_customers", "description": "List customers", "inputSchema": {...} },
+    { "name": "post_customers", "description": "Create customer", ... },
+    ...108 more
+  ]
+}
+```
+
+No `mcp:` block in the manifest. The synthesis is automatic.
+
+## When to declare `mcp:` explicitly
+
+Three cases where you'd add an `mcp:` block instead of relying on derivation:
+
+### 1. The upstream already has a real MCP server
+
+If there's a hand-curated MCP server for the API (with thoughtful tool naming, grouped operations, custom prompts), use it:
+
+```yaml
+interfaces:
+  mcp:
+    url: https://example.com/mcp
+```
+
+This bypasses synthesis entirely — godmode just proxies.
+
+### 2. The synthesized tool surface is too large
+
+Stripe has 108 routes → 108 synthesized tools. Some MCP clients struggle past ~50. Declare a hand-picked subset by shipping your own stdio MCP server:
+
+```yaml
+interfaces:
+  mcp:
+    command: node
+    args: ["dist/curated-stripe-mcp.js"]
+```
+
+The package ships a 200-line server that exposes only `create_customer`, `list_charges`, `refund_charge` — the calls agents actually make.
+
+### 3. Tools need shape the synthesis can't infer
+
+Synthesized tool descriptions come from OpenAPI `description` fields. If those are vague or missing, the agent struggles. A hand-written MCP server can:
+
+- Combine multiple REST calls into one tool (e.g. "create customer + payment method in one shot")
+- Add prompt-engineered guidance to tool descriptions
+- Validate inputs more strictly than the spec
+
+## Coexistence
+
+You can declare `mcp:` AND have `api:`/`graphql:` in the same manifest. `godmode <ext> mcp` then uses the *declared* mcp, NOT synthesis from the other interfaces. If you want both — synthesized routes plus hand-curated tools — your declared MCP server should expose them itself.
+
+## What's never synthesized
+
+- **Pagination helpers.** OpenAPI rarely declares pagination consistently; synthesis picks routes one-shot.
+- **Composite operations.** "Create customer THEN attach payment method" is two synthesized tools, not one.
+- **Long-running tasks.** Tools that need polling/streaming need a real MCP server.
+
+For these, declare `mcp:` and ship code.
+
+## Permissions still apply
+
+The `permissions:` block in [`settings.yaml`](/docs/permissions) gates MCP tool calls the same as REST routes. A tool synthesized from `POST /v1/customers` is denied by `deny: { resources: [customers], methods: [POST] }` — same rule, same evaluation, regardless of whether the agent reaches it via REST or MCP.
+
+## See also
+
+- [Multi-interface extensions](/developers/multi-interface) — declaring `mcp:` alongside `api:` / `graphql:`.
+- [Interface types](/developers/interface-types) — when to pick `mcp` as the primary interface.
+- [Permissions](/docs/permissions) — gating MCP tool calls.

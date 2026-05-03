@@ -1,6 +1,64 @@
 ---
 title: Cursor
-description: Wire godmode extensions into Cursor via MCP.
+description: Wire godmode extensions into Cursor as MCP servers.
 ---
 
-> TODO: Cursor's MCP config path + snippet. Note how Cursor's tool-call UX differs from Claude Code.
+Cursor speaks MCP over stdio, so any godmode extension can be exposed as a Cursor tool with one config block. The wiring is identical in shape to [Claude Code](/docs/claude-code) — only the file path differs.
+
+## Where the config lives
+
+| Scope | Path |
+|---|---|
+| Global (all projects) | `~/.cursor/mcp.json` |
+| Per-project | `<project>/.cursor/mcp.json` |
+
+Cursor merges global and per-project; per-project entries override global ones with the same key.
+
+## Minimal wiring
+
+```json
+{
+  "mcpServers": {
+    "stripe": {
+      "command": "godmode",
+      "args": ["stripe", "mcp"],
+      "env": { "STRIPE_API_KEY": "sk_test_..." }
+    }
+  }
+}
+```
+
+That's it. Restart Cursor (or use the **MCP: Reload Servers** command) and `mcp__stripe__*` tools appear in Cursor's tool palette.
+
+## Tool-call UX vs Claude Code
+
+A few differences worth knowing:
+
+- **Approval flow.** Cursor surfaces an inline accept/reject for each MCP tool call by default. Claude Code prompts at the file/permission level. Cursor's approval can be made one-shot per session under Settings → MCP.
+- **Tool naming.** Cursor displays the raw `mcp__<server>__<tool>` slug. Claude Code rewrites it for readability. Pick descriptive `name` values in your manifests — they show up verbatim in Cursor.
+- **Arguments view.** Cursor renders MCP tool args as a JSON object, so structured params work cleanly. Avoid free-form natural-language args; the agent will struggle to fill them in correctly.
+
+## Per-project + per-extension setup
+
+The pairing that scales:
+
+```sh
+# global: tools you use everywhere
+godmode -g ext install context7
+
+# project: tools just for this codebase
+cd ~/projects/checkout
+godmode ext install stripe
+```
+
+Then `~/.cursor/mcp.json` wires `context7`, and `<project>/.cursor/mcp.json` adds `stripe` for that project only. Cursor merges them at session start.
+
+<Callout type="info">
+  Don't commit secrets in `mcp.json` you push to git. Use `.cursor/mcp.json` per-project (gitignored by default) or omit `env` and let Cursor pass through the shell env.
+</Callout>
+
+## See also
+
+- [Claude Code](/docs/claude-code) — same MCP shape, different config path.
+- [Other MCP clients](/docs/other-mcp-clients) — generic stdio pattern for Continue, Zed, custom agents.
+- [Permissions](/docs/permissions) — scope what each MCP-exposed extension can actually do.

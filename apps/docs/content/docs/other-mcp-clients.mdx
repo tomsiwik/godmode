@@ -1,6 +1,64 @@
 ---
 title: Other MCP clients
-description: The generic stdio MCP pattern works anywhere.
+description: The generic stdio MCP pattern — works with any client, not just Claude Code or Cursor.
 ---
 
-> TODO: any client that speaks MCP over stdio can spawn `godmode <ext> mcp`. Examples: Continue, Zed, custom agents. Generic config shape.
+Any client that speaks the [Model Context Protocol](https://modelcontextprotocol.io) over stdio can spawn `godmode <ext> mcp` and consume it as a tool source. The spec is open, the wiring shape is identical across clients — only the config file location differs.
+
+## Generic config shape
+
+Every MCP-aware client expects roughly this entry:
+
+```json
+{
+  "mcpServers": {
+    "<server-name>": {
+      "command": "godmode",
+      "args": ["<extension>", "mcp"],
+      "env": { "<AUTH_VAR>": "<value>" }
+    }
+  }
+}
+```
+
+- **`command`** — the binary to spawn. Always `godmode`.
+- **`args`** — the extension slug, then the `mcp` interface verb. Optionally followed by extension-specific flags.
+- **`env`** *(optional)* — environment passed to the spawned process. If omitted, godmode reads from the client's inherited env or the cwd `.env`.
+
+## Examples by client
+
+| Client | Config path | Notes |
+|---|---|---|
+| **[Claude Code](/docs/claude-code)** | `~/.claude/settings.json` (global) or `<project>/.claude/settings.local.json` | Tool prefix: `mcp__<server>__<tool>`. Permission via `Bash(godmode:*)` covers every extension at once. |
+| **[Cursor](/docs/cursor)** | `~/.cursor/mcp.json` or `<project>/.cursor/mcp.json` | Inline accept/reject per call by default. |
+| **Continue** | `~/.continue/config.json` under `mcpServers` | Active model must be MCP-capable. |
+| **Zed** | Workspace settings → `context_servers` | Uses the same `command`/`args`/`env` shape. |
+| **Custom agent** | Wherever your client reads MCP servers from | Spec: [MCP servers](https://spec.modelcontextprotocol.io/specification/server/). |
+
+## Spawning manually for testing
+
+You can drive any extension's MCP interface from the terminal to confirm it works before wiring a client:
+
+```sh
+godmode stripe mcp                 # serves over stdio; your terminal is the client
+# In another terminal:
+echo '{"jsonrpc":"2.0","id":1,"method":"tools/list"}' | godmode stripe mcp
+```
+
+The first invocation hangs (it's serving). The second pipes a JSON-RPC `tools/list` request and prints the tool catalog — useful for verifying `--help` output matches what's actually exposed over MCP.
+
+## When to use MCP vs `Bash(godmode:*)`
+
+| | MCP server entry | Bash invocation |
+|---|---|---|
+| **Tool surface** | Each route is a typed tool with named params | Free-form CLI grammar |
+| **Approval UX** | Per-tool approval (most clients) | Per-permission (one-shot for the whole binary) |
+| **Best for** | Structured APIs, agent should "discover" tools | Quick wins, scripting, less-structured exploration |
+
+Most teams end up using both — MCP for the few extensions where typed tools matter (Stripe, GitHub), `Bash(godmode:*)` for everything else.
+
+## See also
+
+- [Claude Code](/docs/claude-code) — full MCP wiring walkthrough.
+- [Cursor](/docs/cursor) — MCP wiring + UX differences.
+- [Permissions](/docs/permissions) — scope what each MCP-exposed extension can do.

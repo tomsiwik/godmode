@@ -1,6 +1,92 @@
 ---
 title: PR workflow
-description: Branching, commit style, review expectations.
+description: Branch naming, commits, required checks, and what reviewers look for.
 ---
 
-> TODO: branch naming, commit message conventions, required checks (tests + compliance), how to add a new extension PR (manifest + test + README).
+Lightweight conventions — opinionated where it makes review faster, flexible everywhere else.
+
+## Branch naming
+
+```
+<type>/<short-slug>
+```
+
+| Type | Use for | Example |
+|---|---|---|
+| `feat` | New extension, new interface, new feature | `feat/stripe-extension` |
+| `fix` | Bugfix, behavior correction | `fix/help-trailing-whitespace` |
+| `docs` | Docs-only change | `docs/auth-types-page` |
+| `chore` | Deps, refactors, tooling | `chore/bump-fumadocs` |
+| `ci` | CI/build pipeline only | `ci/macos-runner` |
+
+## Commit messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org):
+
+```
+feat: add stripe extension manifest
+fix: respect prefix override in api interface
+docs(auth): clarify basic auth pre-encoding requirement
+chore(deps): bump vite from 8.0.8 to 8.0.10
+```
+
+Why: the changeset CLI generates release notes from commit prefixes. Sloppy prefixes mean sloppy release notes.
+
+## Changeset
+
+For any change that affects shipped behavior (new extension, bug fix, API tweak):
+
+```sh
+pnpm changeset
+```
+
+Pick `patch` (default — pre-1.0 godmode never bumps minor or major). Write a one-paragraph summary of what changed and why. Commit the resulting `.changeset/*.md` file.
+
+Skip the changeset for: docs-only PRs, CI tweaks, internal refactors.
+
+## Required checks (must pass to merge)
+
+| Check | What it covers | Local equivalent |
+|---|---|---|
+| `test` | Vitest suites, all packages | `pnpm -r test` |
+| `compliance` | help2man + mandoc + groff lint | `pnpm test:compliance` |
+| `lint` | Biome lint across workspace | `pnpm lint` |
+| `types` | `tsc --noEmit` per package | `pnpm types:check` (in each package) |
+| `build` | All packages build cleanly | `pnpm build` |
+
+Run locally before pushing:
+
+```sh
+pnpm -r test && pnpm lint && pnpm build
+```
+
+That's the same set CI runs, in the order most likely to fail fast.
+
+## Adding a new extension — checklist
+
+1. **`extensions/<slug>/manifest.yaml`** — validate against [the schema](/developers/manifest-schema).
+2. **`extensions/<slug>/package.json`** — `name`, `exports."./manifest"`, `files`, `keywords: ["godmode-extension"]`. See [Publishing](/developers/publishing).
+3. **`extensions/<slug>/README.md`** — links to upstream docs, env var name, known gotchas.
+4. **`extensions/<slug>/test/smoke.test.ts`** — at least one assertion per declared interface. See [Testing](/developers/testing).
+5. **`apps/docs/content/extensions/<slug>.mdx`** — extension docs page (use any existing one as a template).
+6. **`apps/docs/content/extensions/meta.json`** — add the slug to the sidebar in the right group (REST / GraphQL / MCP).
+7. **Changeset** — one-line summary.
+
+PRs missing any of these get a "needs polish" label and won't be merged until complete.
+
+## Review expectations
+
+- **Small PRs preferred.** One extension, one bug, one doc page. Anything bigger gets a review comment asking to split.
+- **Tests required.** Behavior changes without a test get blocked.
+- **No unrelated changes.** A "fix help spacing" PR that also bumps fumadocs is two PRs.
+- **Match existing tone.** The docs use a specific voice (terse, table-heavy, direct). The CLI prints terse status, not chatty progress. New code in the same style.
+
+## When in doubt
+
+[Open a draft PR early](https://github.com/tomsiwik/godmode/pulls?q=is%3Apr+is%3Adraft) with `[WIP]` in the title and a description of the direction. Cheaper than building the whole thing and finding out you took a wrong turn.
+
+## See also
+
+- [Repo setup](/developers/setup) — getting the codebase running.
+- [Testing](/developers/testing) — what's covered, how to add tests.
+- [Submit an extension](/extensions/submit) — the user-facing version of this checklist.

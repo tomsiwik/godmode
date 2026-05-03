@@ -1,6 +1,65 @@
 ---
 title: Quickstart
-description: From manifest.yaml to first invocation in 5 minutes.
+description: From an empty folder to a working godmode extension in five minutes.
 ---
 
-> TODO: minimal manifest in an empty folder, `godmode ext install ./folder`, `godmode <slug> api --help`, fire a dry-run request. Show the basic directory layout (`manifest.yaml` only).
+The shortest possible path from "I want to wrap an API" to a working `godmode <my-thing> api ...` invocation.
+
+## 1. The minimum manifest
+
+In an empty folder, create one file:
+
+```yaml
+# my-petstore/manifest.yaml
+name: my-petstore
+description: My local copy of the Pet Store sample
+interfaces:
+  api:
+    spec: https://petstore3.swagger.io/api/v3/openapi.json
+    url: https://petstore3.swagger.io/api/v3
+```
+
+That's it — no `package.json`, no build step. A single YAML file in a folder is a valid extension.
+
+## 2. Install from disk
+
+```sh
+godmode ext install ./my-petstore
+```
+
+godmode reads the manifest, fetches the OpenAPI spec, parses the routes, and registers the extension. The resolved spec is cached at `~/.godmode/extensions/my-petstore.json`.
+
+## 3. Verify discovery
+
+```sh
+godmode my-petstore --help
+godmode my-petstore api --help
+godmode my-petstore api pet --help
+```
+
+The `--help` ladder ([reference](/docs/discovery)) walks you from the extension overview down to per-resource operations — all derived from the spec.
+
+## 4. Fire a request
+
+```sh
+godmode my-petstore api GET pet 1
+```
+
+If the spec is reachable and the upstream API is up, you'll see the JSON response. If the upstream needs auth, godmode would have shown that in `--help`; this one doesn't.
+
+## 5. Iterate
+
+Edit `manifest.yaml`, then re-register:
+
+```sh
+godmode ext update my-petstore     # re-fetches the spec, rebuilds the cache
+```
+
+That's the full inner loop. See [Local development](/developers/local-development) for the watch-on-edit workflow and how to debug a malformed spec.
+
+## What's next
+
+- **[Manifest schema](/developers/manifest-schema)** — every field you can put in `manifest.yaml`.
+- **[Interface types](/developers/interface-types)** — when to pick `api`, `graphql`, or `mcp`.
+- **[Auth types](/developers/auth-types)** — adding an `auth:` block (bearer, api-key, basic).
+- **[Publishing](/developers/publishing)** — turning the folder into a publishable npm package.

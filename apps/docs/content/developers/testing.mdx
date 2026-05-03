@@ -1,6 +1,115 @@
 ---
 title: Testing
-description: The compliance pipeline and parametrized test matrix.
+description: The test matrix, the help-compliance pipeline, and how to run them locally.
 ---
 
-> TODO: `pnpm -r test` runs everything. The 200+ CLI tests cover rule × help-target combinations. How to add a new rule (edit `help-rules.ts`, it auto-applies to every target). The GNU help compliance pipeline (`help2man → mandoc -Tlint → groff -ww`) and how to run it locally.
+The godmode test suite is designed for one job: catch regressions in the CLI's user-facing behavior. Two layers — Vitest for code, GNU help compliance for `--help` output.
+
+## Run everything
+
+```sh
+pnpm -r test           # vitest across the workspace, recursive
+```
+
+Add `--coverage` for HTML reports. CI runs the same command, no flag drift.
+
+## What's covered
+
+| Suite | Location | What it tests |
+|---|---|---|
+| Parser | `packages/cli/test/parser.test.ts` | CLI grammar parsing — flags, args, positional resolution at every nesting level |
+| Dispatch | `packages/cli/test/dispatch.test.ts` | Extension lookup, interface routing, server-fn invocation |
+| Help system (parametrized) | `packages/cli/test/help-rules.test.ts` | 200+ rule × help-target combinations |
+| Per-extension smoke | `extensions/<slug>/test/*.test.ts` | At least one route per declared interface |
+| Manifest schema | `packages/cli/test/manifest-schema.test.ts` | Every fixture parses cleanly; invalid fixtures error with expected messages |
+
+## The help-rules matrix
+
+`packages/cli/src/help-rules.ts` declares ~30 rules — things like "every help page must have a USAGE section", "EXAMPLES come last", "no trailing whitespace before the footer". Each rule is checked against ~15 help targets (root, every built-in, every spec-derived help page). That's 450+ assertions from one file.
+
+Add a new rule once, get coverage everywhere:
+
+```ts
+// packages/cli/src/help-rules.ts
+export const rules: HelpRule[] = [
+  // ...existing rules
+  {
+    name: 'mentions-help-flag',
+    description: '--help is documented in OPTIONS at every level',
+    check: (output) => /^\s+-h, --help/m.test(output),
+  },
+];
+```
+
+The next `pnpm test` run applies it to all 15 targets automatically.
+
+## GNU help compliance pipeline
+
+Beyond Vitest, every help page is run through the GNU coreutils tool chain to verify it parses as a real man page:
+
+```
+help2man  →  generates man source from --help output
+mandoc    -Tlint validates man syntax
+groff     -ww renders, warning on undefined macros
+```
+
+This catches things Vitest can't — invalid man-page indentation, missing dashes in option lists, malformed example blocks.
+
+Run it locally:
+
+```sh
+pnpm -C packages/cli test:compliance
+```
+
+Requires `help2man`, `mandoc`, `groff` on PATH. macOS: `brew install groff mandoc help2man`. Linux: usually pre-installed.
+
+If you don't have them, the CLI has bundled mirrors under `utils/groff`, `utils/mandoc`, `utils/help2man` — `pnpm test:compliance:bundled` builds and uses those instead.
+
+## Adding a test for a new extension
+
+```sh
+# Create the test file
+mkdir -p extensions/myext/test
+cat > extensions/myext/test/smoke.test.ts <<'EOF'
+import { describe, expect, it } from 'vitest';
+import { dispatchHelp } from '@godmode-cli/test';
+
+describe('myext', () => {
+  it('renders extension overview', async () => {
+    const output = await dispatchHelp(['myext']);
+    expect(output).toContain('myext');
+    expect(output).toMatch(/Interfaces:/);
+  });
+
+  it('lists at least one resource via api --help', async () => {
+    const output = await dispatchHelp(['myext', 'api']);
+    expect(output).toMatch(/Resources:/);
+  });
+});
+EOF
+```
+
+The `@godmode-cli/test` package exports helpers (`dispatchHelp`, `dispatchCall`, `mockUpstream`) that handle the boilerplate.
+
+## Running a single suite
+
+```sh
+pnpm -C packages/cli test                 # just CLI core
+pnpm -C extensions/stripe test            # just stripe
+pnpm -r test --filter='!apps/*'           # everything except apps/
+```
+
+## CI matrix
+
+GitHub Actions runs:
+
+- `pnpm -r test` on Node 20, 22 (current LTS pair) on Linux + macOS
+- `pnpm test:compliance` on Linux only (the GNU tools are most reliable there)
+- `pnpm lint` and `pnpm types:check` workspace-wide
+
+Required for merge — see [PR workflow](/developers/pr-workflow).
+
+## See also
+
+- [Repo setup](/developers/setup) — getting the workspace running.
+- [PR workflow](/developers/pr-workflow) — what reviewers expect.
