@@ -55,10 +55,10 @@ Blocked: STRIPE_API_KEY is not set. Set it in your shell or in a .env in the cur
 
 ```sh
 godmode <ext> --help            # shows the env var the extension expects
-godmode --debug <ext> ...       # logs the request including which auth source was used
+GODMODE_DEBUG=1 godmode <ext> ...       # logs the request including which auth source was used
 ```
 
-`GODMODE_DEBUG=1` does the same as `--debug` and persists for the shell session.
+`GODMODE_DEBUG=1` enables debug logging for the shell session.
 
 ## Common pitfalls
 

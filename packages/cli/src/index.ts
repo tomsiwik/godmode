@@ -12,6 +12,9 @@ import { parseArgs } from './args.js';
 import { showHelp, showApiHelp, showExtensionOverview, showExtensionVersion, showVersion } from './help.js';
 import { runAgentCommand } from '@godmode-cli/command-agent';
 import { getInterface } from './interfaces.js';
+import { EXIT_CODES } from './exit-codes.js';
+import { explainPermission, suggestedAllowRule } from './permissions.js';
+import { warnSettingsErrors } from './settings.js';
 
 loadEnv();
 
@@ -27,12 +30,24 @@ loadEnv();
 // `godmode stripe api --help` → interface help, etc.
 
 const VALID_INTERFACES = new Set<InterfaceKey>(['api', 'graphql', 'mcp', 'skill']);
-const RESERVED_SLUGS = new Set(['ext', 'agent']);
+const RESERVED_SLUGS = new Set([
+  'ext',
+  'extension',
+  'agent',
+  'script',
+  'workflow',
+  'history',
+  'sessions',
+  'trace',
+  'auth',
+  'permissions',
+]);
 
 async function main() {
   const args = process.argv.slice(2);
 
   if (!args.length || (args.length === 1 && (args[0] === '-h' || args[0] === '--help'))) {
+    warnSettingsErrors();
     showHelp();
     return;
   }
@@ -54,6 +69,10 @@ async function main() {
     await runAgent(rest);
     return;
   }
+  if (extensionSlug === 'permissions') {
+    await runPermissions(rest);
+    return;
+  }
 
   // User extensions — interface is required.
   const multi = installedExtension(extensionSlug);
@@ -61,7 +80,7 @@ async function main() {
     process.stderr.write(`'${extensionSlug}' is not an installed extension.\n`);
     process.stderr.write(`Try 'godmode ext list' to see installed extensions.\n`);
     process.stderr.write(`Try 'godmode --help' for more information.\n`);
-    process.exit(1);
+    process.exit(EXIT_CODES.notFound);
   }
 
   const declared = declaredInterfaces(multi);
@@ -84,13 +103,13 @@ async function main() {
     process.stderr.write(`Missing interface.\n`);
     process.stderr.write(`'${extensionSlug}' declares: ${declared.join(', ')}.\n`);
     process.stderr.write(`Try 'godmode ${extensionSlug} ${declared[0]} ${first}' or 'godmode ${extensionSlug} --help'.\n`);
-    process.exit(1);
+    process.exit(EXIT_CODES.usage);
   }
   if (!declared.includes(first as InterfaceKey)) {
     process.stderr.write(`'${extensionSlug}' does not declare a '${first}' interface.\n`);
     process.stderr.write(`Declared: ${declared.join(', ')}.\n`);
     process.stderr.write(`Try 'godmode ${extensionSlug} --help' for more information.\n`);
-    process.exit(1);
+    process.exit(EXIT_CODES.usage);
   }
 
   await runInterface(first as InterfaceKey, extensionSlug, rest.slice(1));
@@ -172,6 +191,7 @@ async function runExt(rest: string[]) {
   }
 
   if (cmd === 'list') {
+    warnSettingsErrors();
     await listApis();
     return;
   }
@@ -192,12 +212,12 @@ async function runExt(rest: string[]) {
       process.stderr.write(`  godmode ${cmd} ${i} --help\n`);
     }
     process.stderr.write(`\nTry 'godmode ext --help' for more information.\n`);
-    process.exit(1);
+    process.exit(EXIT_CODES.usage);
   }
 
   process.stderr.write(`Unknown ext command '${cmd}'.\n`);
   process.stderr.write(`Try 'godmode ext --help' for more information.\n`);
-  process.exit(1);
+  process.exit(EXIT_CODES.usage);
 }
 
 // ── built-in: agent ──
@@ -207,12 +227,96 @@ async function runAgent(rest: string[]) {
   if (code !== 0) process.exit(code);
 }
 
+// ── built-in: permissions ──
+
+function showPermissionsHelp() {
+  console.log(`Inspect godmode permission policy.
+
+Usage:
+  godmode permissions list
+  godmode permissions explain <extension> <interface> <target> [method]
+
+Exit codes:
+  0   success / allowed
+  2   usage or parse error
+  3   extension or route not found
+  4   permission denied
+  10  upstream HTTP 4xx
+  11  upstream HTTP 5xx
+  12  upstream failure`);
+}
+
+async function runPermissions(rest: string[]) {
+  const cmd = rest[0];
+  if (!cmd || cmd === '--help' || cmd === '-h') {
+    warnSettingsErrors();
+    showPermissionsHelp();
+    return;
+  }
+
+  if (cmd === 'list') {
+    const { loadSettingsDetailed } = await import('./settings.js');
+    const loaded = loadSettingsDetailed();
+    for (const error of loaded.errors) {
+      process.stderr.write(`Warning: cannot parse ${error.path}: ${error.message}\n`);
+    }
+    const sources = loaded.sources.flatMap((source) => {
+      const extensions = source.settings.extensions ?? {};
+      return Object.entries(extensions).flatMap(([slug, settings]) => {
+        const permissions = settings.permissions;
+        if (!permissions?.allow?.length && !permissions?.deny?.length) return [];
+        return [{ slug, permissions, origin: `${source.scope}:${source.path}` }];
+      });
+    });
+    if (!sources.length) {
+      console.log('No permissions configured.');
+      return;
+    }
+    for (const { slug, permissions, origin } of sources) {
+      console.log(`${slug}:`);
+      for (const effect of ['allow', 'deny'] as const) {
+        for (const rule of permissions[effect] ?? []) {
+          const resources = rule.resources?.join(', ') || '*';
+          const methods = rule.methods?.join(', ') || '*';
+          console.log(`  ${effect} resources=[${resources}] methods=[${methods}] origin=${origin}`);
+        }
+      }
+    }
+    return;
+  }
+
+  if (cmd === 'explain') {
+    const [extension, iface, target, maybeMethod] = rest.slice(1);
+    if (!extension || !iface || !target) {
+      process.stderr.write('Usage: godmode permissions explain <extension> <interface> <target> [method]\n');
+      process.exit(EXIT_CODES.usage);
+    }
+    const method = iface === 'mcp' ? 'mcp' : (maybeMethod || 'GET');
+    const resource = target.replace(/^\/+/, '').replace(/\//g, '.').replace(/^v\d+\./i, '') || '*';
+    const decision = explainPermission({ extension, resource, method });
+    console.log(`${decision.allowed ? 'allow' : 'deny'} ${extension} ${iface} ${target} ${method.toUpperCase()}`);
+    if (decision.reason) console.log(decision.reason);
+    if (decision.rule) {
+      console.log(`winning rule: resources=[${decision.rule.resources?.join(', ') || '*'}] methods=[${decision.rule.methods?.join(', ') || '*'}] origin=${decision.origin || 'settings.yaml'}`);
+    }
+    if (!decision.allowed) {
+      console.log(`suggested allow rule:\n${suggestedAllowRule({ extension, resource, method })}`);
+      process.exit(EXIT_CODES.permissionDenied);
+    }
+    return;
+  }
+
+  process.stderr.write(`Unknown permissions command '${cmd}'.\n`);
+  process.stderr.write(`Try 'godmode permissions --help' for more information.\n`);
+  process.exit(EXIT_CODES.usage);
+}
+
 // ── interface dispatch ──
 
 async function runInterface(iface: string, extensionName: string, rest: string[]) {
   if (iface === 'skill') {
     process.stderr.write(`Skill interface not yet implemented.\n`);
-    process.exit(1);
+    process.exit(EXIT_CODES.usage);
   }
 
   // Intercept --version anywhere in the arg list — shows the extension's
@@ -245,7 +349,7 @@ async function runInterface(iface: string, extensionName: string, rest: string[]
   const err = handler.validate();
   if (err) {
     process.stderr.write(err + '\n');
-    process.exit(1);
+    process.exit(EXIT_CODES.usage);
   }
 
   await handler.execute();

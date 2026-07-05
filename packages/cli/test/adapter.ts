@@ -13,10 +13,15 @@ const METHOD_POSITIONAL: Record<string, string> = {
 };
 
 export const gm = (...args: string[]) => gmIn(undefined, ...args);
+export const gmResult = (cwd: string | undefined, ...args: string[]) => runCli(cwd, args);
 
 /** Same as gm, but runs the CLI from a specific cwd. Used to exercise the
  *  upward-walk resolver for project-scoped `.godmode/` directories. */
 export const gmIn = (cwd: string | undefined, ...args: string[]) => {
+  return runCli(cwd, args).output;
+};
+
+function runCli(cwd: string | undefined, args: string[]) {
   // Test-only: --dry-run and --debug are not CLI flags; they map to env
   // vars internally. Strip them from args and set the env vars.
   const env = { ...process.env };
@@ -27,14 +32,15 @@ export const gmIn = (cwd: string | undefined, ...args: string[]) => {
   });
   const cliEntry = resolve(__dirname, '..', 'dist', 'index.js');
   try {
-    return execSync(
+    const output = execSync(
       `node ${JSON.stringify(cliEntry)} ${filtered.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
       { cwd: cwd ?? resolve(__dirname, '..'), encoding: 'utf-8', timeout: 10000, env },
     ).trim();
+    return { status: 0, output };
   } catch (e: any) {
-    return (e.stdout || '').trim();
+    return { status: e.status ?? 1, output: (e.stdout || '').trim() };
   }
-};
+}
 
 function loadManifest(name: string): Manifest {
   const base = resolve(homedir(), '.godmode');
@@ -74,7 +80,7 @@ function buildTestCases(name: string, manifest: Manifest) {
 
       acc.push({
         label: `${route.method.toUpperCase()} ${route.path}`,
-        args: ['api', name, methodPositional, ...segments, '--dry-run'],
+        args: [name, 'api', methodPositional, ...segments, '--dry-run'],
         expected: `${manifest.config.url}${expectedPath}`,
       });
       return acc;
@@ -86,9 +92,9 @@ export function testAdapter(name: string, configPath: string) {
     let cases: ReturnType<typeof buildTestCases>;
 
     beforeAll(() => {
-      const list = gm('extension', 'list');
+      const list = gm('ext', 'list');
       if (!list.includes(name)) {
-        const result = gm('extension', 'add', configPath);
+        const result = gm('ext', 'install', configPath);
         if (result.includes('Error') || result.includes('failed')) {
           throw new Error(`Failed to add ${name}: ${result}`);
         }
@@ -108,7 +114,7 @@ export function testAdapter(name: string, configPath: string) {
     });
 
     it('--help shows usage and resources', () => {
-      const out = gm('api', name, '--help');
+      const out = gm(name, 'api', '--help');
       expect(out).toContain('Usage:');
       expect(out).toContain('Resources:');
     });

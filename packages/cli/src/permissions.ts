@@ -1,4 +1,4 @@
-import { extensionSettings, type PermissionRule } from './settings.js';
+import { loadSettingsDetailed, settingsErrorMessage, type PermissionRule } from './settings.js';
 
 /**
  * Permission evaluation.
@@ -22,6 +22,9 @@ export interface CheckResult {
   allowed: boolean;
   /** Non-null when `allowed: false` — explains the decision. */
   reason?: string;
+  rule?: PermissionRule;
+  origin?: string;
+  defaultDenied?: boolean;
 }
 
 export interface CheckInput {
@@ -35,27 +38,61 @@ export interface CheckInput {
 }
 
 export function checkPermission(input: CheckInput): CheckResult {
-  const cfg = extensionSettings(input.extension);
-  const block = cfg.permissions;
+  const loaded = loadSettingsDetailed();
+  const settingsError = loaded.errors[0];
+  if (settingsError) {
+    return {
+      allowed: false,
+      reason: settingsErrorMessage(settingsError),
+      defaultDenied: true,
+    };
+  }
 
-  const hasAny = !!(block?.allow?.length || block?.deny?.length);
+  const blocks = loaded.sources
+    .map((source) => ({
+      origin: `${source.scope}:${source.path}`,
+      permissions: source.settings.extensions?.[input.extension]?.permissions,
+    }))
+    .filter((source) => !!source.permissions);
+
+  const hasAny = blocks.some(({ permissions }) => !!(permissions?.allow?.length || permissions?.deny?.length));
   if (!hasAny) return { allowed: true };
 
-  for (const rule of block?.deny ?? []) {
-    if (ruleMatches(rule, input)) {
-      return {
-        allowed: false,
-        reason: `denied by permissions for ${input.extension}: ${describe(rule, input, 'deny')}`,
-      };
+  for (const block of blocks) {
+    for (const rule of block.permissions?.deny ?? []) {
+      if (ruleMatches(rule, input)) {
+        return {
+          allowed: false,
+          reason: `denied by permissions for ${input.extension}: ${describe(rule, input, 'deny')}`,
+          rule,
+          origin: block.origin,
+        };
+      }
     }
   }
-  for (const rule of block?.allow ?? []) {
-    if (ruleMatches(rule, input)) return { allowed: true };
+  for (const block of blocks) {
+    for (const rule of block.permissions?.allow ?? []) {
+      if (ruleMatches(rule, input)) return { allowed: true, rule, origin: block.origin };
+    }
   }
   return {
     allowed: false,
     reason: `no allow rule matches ${input.resource} ${input.method.toUpperCase()} for ${input.extension}`,
+    defaultDenied: true,
   };
+}
+
+export function explainPermission(input: CheckInput): CheckResult & { input: CheckInput } {
+  return { ...checkPermission(input), input };
+}
+
+export function suggestedAllowRule(input: CheckInput): string {
+  return [
+    'permissions:',
+    '  allow:',
+    `    - resources: [${input.resource}]`,
+    `      methods: [${input.method.toUpperCase()}]`,
+  ].join('\n');
 }
 
 // ── helpers ──────────────────────────────────────────────────
@@ -109,4 +146,12 @@ export function resourceFromSegments(segments: Array<{ value: string; isParam: b
 /** MCP tool names are already flat; use as-is. */
 export function resourceFromTool(toolName: string): string {
   return toolName;
+}
+
+export function resourceFromRawPath(path: string): string {
+  const parts = path
+    .split('/')
+    .filter(Boolean)
+    .filter((v) => !/^v\d+$/i.test(v));
+  return parts.join('.') || '*';
 }

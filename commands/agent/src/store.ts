@@ -2,6 +2,7 @@ import { randomUUID } from 'node:crypto';
 import { mkdirSync, readFileSync, writeFileSync, existsSync, readdirSync } from 'node:fs';
 import { homedir } from 'node:os';
 import { resolve } from 'node:path';
+import { parse as parseYaml, stringify as stringifyYaml } from 'yaml';
 import type { CodingAgentsSettings, HarnessAdapter, RunRecord, TurnRecord } from './types.js';
 
 export const GODMODE_HOME = process.platform === 'linux' && process.env.XDG_CONFIG_HOME
@@ -36,13 +37,35 @@ export function readJson<T>(path: string): T | null {
   }
 }
 
-function readSettingsFile(path: string): CodingAgentsSettings {
+function readJsonSettingsFile(path: string): CodingAgentsSettings {
   return readJson<CodingAgentsSettings>(path) ?? {};
 }
 
+function readYamlSettingsFile(path: string): CodingAgentsSettings {
+  try {
+    return parseYaml(readFileSync(path, 'utf-8')) ?? {};
+  } catch {
+    return {};
+  }
+}
+
+function migrateSettingsJson(dir: string): CodingAgentsSettings {
+  const yamlPath = resolve(dir, 'settings.yaml');
+  if (existsSync(yamlPath)) return readYamlSettingsFile(yamlPath);
+
+  const jsonPath = resolve(dir, 'settings.json');
+  if (!existsSync(jsonPath)) return {};
+
+  const settings = readJsonSettingsFile(jsonPath);
+  mkdirSync(dir, { recursive: true });
+  writeFileSync(yamlPath, stringifyYaml(settings));
+  process.stderr.write(`Migrated ${jsonPath} -> ${yamlPath}. Future agent settings are read from settings.yaml.\n`);
+  return settings;
+}
+
 export function loadSettings(cwd = process.cwd()): CodingAgentsSettings {
-  const globalSettings = readSettingsFile(resolve(GODMODE_HOME, 'settings.json'));
-  const projectSettings = readSettingsFile(resolve(cwd, '.godmode', 'settings.json'));
+  const globalSettings = migrateSettingsJson(GODMODE_HOME);
+  const projectSettings = migrateSettingsJson(resolve(cwd, '.godmode'));
   return {
     ...globalSettings,
     ...projectSettings,

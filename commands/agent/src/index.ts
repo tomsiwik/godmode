@@ -56,13 +56,29 @@ function parseStartSendArgs(action: 'start' | 'send', argv: string[]): StartSend
       harness = value as HarnessId;
       continue;
     }
+    if (arg.startsWith('--harness=')) {
+      const value = arg.slice('--harness='.length);
+      if (!value || !(value in HARNESSES)) throw new Error('Missing or invalid value for --harness');
+      harness = value as HarnessId;
+      continue;
+    }
     if (arg === '--model') {
       model = remaining[++i];
       if (!model) throw new Error('Missing value for --model');
       continue;
     }
+    if (arg.startsWith('--model=')) {
+      model = arg.slice('--model='.length);
+      if (!model) throw new Error('Missing value for --model');
+      continue;
+    }
     if (arg === '--effort') {
       effort = remaining[++i];
+      if (!effort) throw new Error('Missing value for --effort');
+      continue;
+    }
+    if (arg.startsWith('--effort=')) {
+      effort = arg.slice('--effort='.length);
       if (!effort) throw new Error('Missing value for --effort');
       continue;
     }

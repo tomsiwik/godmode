@@ -1,7 +1,7 @@
-import { resolve, basename, dirname, extname, parse as parsePath } from 'node:path';
+import { resolve, basename, dirname, extname, isAbsolute, parse as parsePath } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync, readFileSync } from 'node:fs';
-import { mkdir, readFile, writeFile, readdir, unlink, access, rename } from 'node:fs/promises';
+import { mkdir, readFile, writeFile, readdir, unlink, access, rename, rm } from 'node:fs/promises';
 import { execSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import {
@@ -21,6 +21,25 @@ export const GODMODE_HOME = resolve(homedir(), '.godmode');
 export type Scope = 'project' | 'global';
 
 const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
+const RESERVED_SLUGS = new Set([
+  'ext',
+  'extension',
+  'agent',
+  'script',
+  'workflow',
+  'history',
+  'sessions',
+  'trace',
+  'auth',
+  'permissions',
+]);
+
+function assertInstallableSlug(slug: string): void {
+  if (!RESERVED_SLUGS.has(slug)) return;
+  throw new Error(
+    `'${slug}' is a reserved extension slug and cannot be installed.\nReserved: ${[...RESERVED_SLUGS].join(', ')}.`,
+  );
+}
 
 /** Files this CLI generates under `.godmode/` that should not be committed. */
 const GITIGNORE_CONTENT = `# godmode — runtime artifacts, do not commit
@@ -122,7 +141,7 @@ async function loadSourceFromDir(dir: string): Promise<ManifestSource | null> {
     if (await exists(filePath)) {
       const text = await readFile(filePath, 'utf-8');
       const raw = ext === '.json' ? JSON.parse(text) : parseYaml(text);
-      return validateSource(raw, filePath);
+      return absolutizeSource(validateSource(raw, filePath), dir);
     }
   }
   return null;
@@ -134,7 +153,46 @@ async function loadSourceFromFile(filePath: string): Promise<{ source: ManifestS
   if (!['.yaml', '.yml', '.json'].includes(ext)) return null;
   const text = await readFile(filePath, 'utf-8');
   const raw = ext === '.json' ? JSON.parse(text) : parseYaml(text);
-  return { source: validateSource(raw, filePath), dir: dirname(filePath) };
+  const dir = dirname(filePath);
+  return { source: absolutizeSource(validateSource(raw, filePath), dir), dir };
+}
+
+function absolutizeSource(source: ManifestSource, dir: string): ManifestSource {
+  const interfaces: ManifestSource['interfaces'] = {};
+  if (source.interfaces.api) interfaces.api = { ...source.interfaces.api };
+  if (source.interfaces.graphql) interfaces.graphql = { ...source.interfaces.graphql };
+  if (source.interfaces.mcp) interfaces.mcp = { ...source.interfaces.mcp };
+  const next: ManifestSource = {
+    ...source,
+    interfaces,
+  };
+  for (const iface of ['api', 'graphql'] as const) {
+    const spec = next.interfaces[iface]?.spec;
+    if (spec && !/^[a-z][a-z0-9+.-]*:/i.test(spec) && !isAbsolute(spec)) {
+      next.interfaces[iface]!.spec = resolve(dir, spec);
+    }
+  }
+  return next;
+}
+
+async function loadSourceFromPackageDir(pkgDir: string): Promise<ManifestSource | null> {
+  const pkgPath = resolve(pkgDir, 'package.json');
+  if (!(await exists(pkgPath))) return null;
+  const pkg = JSON.parse(await readFile(pkgPath, 'utf-8')) as {
+    exports?: Record<string, string | { default?: string }>;
+  };
+  const manifestExport = pkg.exports?.['./manifest'];
+  const manifestPath = typeof manifestExport === 'string'
+    ? manifestExport
+    : manifestExport?.default;
+  if (!manifestPath) {
+    throw new Error(`${pkgPath}: missing exports["./manifest"]`);
+  }
+  const loaded = await loadSourceFromFile(resolve(pkgDir, manifestPath));
+  if (!loaded) {
+    throw new Error(`${pkgPath}: exports["./manifest"] does not point to a readable manifest`);
+  }
+  return loaded.source;
 }
 
 async function resolveSource(input: string): Promise<{ name: string; source: ManifestSource; dir: string }> {
@@ -175,6 +233,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
 
   if (resolved) {
     const { name, source } = resolved;
+    assertInstallableSlug(source.slug || name);
     const ifaceKeys = Object.keys(source.interfaces).filter((k) =>
       INTERFACE_KEYS.includes(k as InterfaceKey),
     ) as InterfaceKey[];
@@ -184,6 +243,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
         name: source.name,
         slug: source.slug || name,
         description: source.description || '',
+        source: 'local',
         auth: source.auth,
         headers: source.headers,
         interfaces: {},
@@ -211,10 +271,16 @@ export async function addApi(input: string, scope: Scope = 'project') {
   // the scope's root. Project scope installs under <cwd>/.godmode/,
   // global under ~/.godmode.
   const scopeRoot = scope === 'global' ? GODMODE_HOME : dirname(extensionsDir);
-  const name = resolved?.name || input;
+  const asPath = resolve(process.cwd(), input);
+  const inputPackageJson = await exists(resolve(asPath, 'package.json'))
+    ? JSON.parse(await readFile(resolve(asPath, 'package.json'), 'utf-8')) as { name?: string }
+    : null;
+  const packageName = inputPackageJson?.name || (input.startsWith('@') ? input : `@godmode-cli/${input}`);
+  const name = resolved?.name || (input.startsWith('@') ? basename(input) : input);
+  assertInstallableSlug(name);
   const installTarget = resolved?.dir && (await exists(resolve(resolved.dir, 'package.json')))
     ? resolved.dir
-    : (input.startsWith('@') ? input : `@godmode-cli/${input}`);
+    : inputPackageJson ? asPath : packageName;
 
   process.stderr.write(`Installing ${name} [${scope}]...\n`);
   try {
@@ -224,9 +290,35 @@ export async function addApi(input: string, scope: Scope = 'project') {
     throw new Error(`Failed to install ${name}: ${err.stderr?.toString().trim() || err.message}`);
   }
 
-  const pkgName = `@godmode-cli/${name}`;
-  const mcpConfigPath = resolve(scopeRoot, 'node_modules', pkgName, '.mcp.json');
-  if (await exists(mcpConfigPath)) {
+  const pkgDir = resolve(scopeRoot, 'node_modules', packageName);
+  const packageSource = await loadSourceFromPackageDir(pkgDir).catch((error: unknown) => {
+    const mcpConfigPath = resolve(pkgDir, '.mcp.json');
+    if (existsSync(mcpConfigPath)) return null;
+    throw error;
+  });
+  if (packageSource) {
+    const slug = packageSource.slug || name;
+    assertInstallableSlug(slug);
+    const ifaceKeys = Object.keys(packageSource.interfaces).filter((k) =>
+      INTERFACE_KEYS.includes(k as InterfaceKey),
+    ) as InterfaceKey[];
+    const multi: MultiManifest = {
+      name: packageSource.name,
+      slug,
+      description: packageSource.description || '',
+      source: 'npm',
+      packageName,
+      auth: packageSource.auth,
+      headers: packageSource.headers,
+      interfaces: {},
+    };
+    for (const iface of ifaceKeys) {
+      const data = await compileInterface(iface, slug, packageSource);
+      (multi.interfaces as Record<string, unknown>)[iface] = data;
+    }
+    await writeFile(resolve(extensionsDir, `${slug}.json`), JSON.stringify(multi, null, 2));
+    process.stderr.write(`Registered "${slug}" [${scope}] from ${packageName}\n`);
+  } else if (await exists(resolve(pkgDir, '.mcp.json'))) {
     process.stderr.write(`Installed "${name}" (MCP server extension)\n`);
   } else {
     process.stderr.write(`Installed "${name}"\n`);
@@ -255,7 +347,17 @@ export async function removeApi(name: string, scope?: Scope) {
     process.exit(1);
   }
   try {
-    await unlink(resolve(dir, `${name}.json`));
+    const manifestPath = resolve(dir, `${name}.json`);
+    let packageName: string | undefined;
+    try {
+      const multi = JSON.parse(await readFile(manifestPath, 'utf-8')) as MultiManifest;
+      packageName = multi.packageName;
+    } catch {}
+    await unlink(manifestPath);
+    if (packageName) {
+      const scopeRoot = resolvedScope === 'global' ? GODMODE_HOME : dirname(dir);
+      await rm(resolve(scopeRoot, 'node_modules', packageName), { recursive: true, force: true });
+    }
     process.stderr.write(`Removed "${name}" [${resolvedScope}]\n`);
   } catch {
     process.stderr.write(`Extension "${name}" not found\n`);
@@ -274,7 +376,7 @@ function findInstalledScope(name: string): Scope | null {
 }
 
 export async function listApis() {
-  const rows: Array<{ scope: Scope; slug: string; ifaces: string; routeTotal: number; description: string; shadowed: boolean }> = [];
+  const rows: Array<{ scope: Scope; source: string; slug: string; ifaces: string; routeTotal: number; description: string; shadowed: boolean }> = [];
   const seen = new Set<string>();
 
   // Project first so it gets to mark its slugs; globals with the same slug
@@ -289,6 +391,7 @@ export async function listApis() {
       seen.add(m.slug);
       rows.push({
         scope,
+        source: m.source || 'local',
         slug: m.slug,
         ifaces: Object.keys(m.interfaces).join(', '),
         routeTotal: Object.values(m.interfaces).reduce((n, d) => n + (d?.routes.length ?? 0), 0),
@@ -305,7 +408,7 @@ export async function listApis() {
   for (const r of rows) {
     const tag = `[${r.scope}${r.shadowed ? ', shadowed' : ''}]`;
     const desc = r.description ? `  ${r.description}` : '';
-    console.log(`  ${r.slug}\t${tag}\t[${r.ifaces}]\t${r.routeTotal} routes${desc}`);
+    console.log(`  ${r.slug}\t${tag}\t${r.source}\t[${r.ifaces}]\t${r.routeTotal} routes${desc}`);
   }
 }
 

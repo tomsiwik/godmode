@@ -2,7 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { mkdtemp, mkdir, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { resolve } from 'node:path';
-import { gmIn } from './adapter';
+import { gmIn, gmResult } from './adapter';
 
 const seg = (value: string, isParam = false) => ({ value, isParam });
 
@@ -110,5 +110,54 @@ describe('permissions', () => {
     const out = gmIn(dir, 'stripe', 'api', 'GET', 'customers', '--dry-run');
     expect(out).toContain('Blocked');
     expect(out).toContain('no allow rule matches');
+  });
+
+  it('raw paths are checked against the same deny rules as named routes', async () => {
+    const dir = await makeProject(`extensions:
+  stripe:
+    permissions:
+      allow:
+        - resources: ['*']
+      deny:
+        - resources: [charges]
+`);
+    const result = gmResult(dir, 'stripe', 'api', 'GET', '/v1/charges', '--dry-run');
+    expect(result.status).toBe(4);
+    expect(result.output).toContain('Blocked');
+    expect(result.output).toContain('charges');
+    expect(result.output).not.toContain('api.stripe-test.com');
+  });
+
+  it('invalid settings fail closed for permissioned dispatch but list still works with a warning', async () => {
+    const dir = await makeProject(`extensions:\n  stripe:\n    permissions: [\n`);
+    const dispatch = gmResult(dir, 'stripe', 'api', 'GET', 'customers', '--dry-run');
+    expect(dispatch.status).toBe(4);
+    expect(dispatch.output).toContain('cannot parse');
+    expect(dispatch.output).toContain('refusing to run with an unreadable policy');
+    expect(dispatch.output).not.toContain('api.stripe-test.com');
+
+    const list = gmResult(dir, 'ext', 'list');
+    expect(list.status).toBe(0);
+    expect(list.output).toContain('Warning: cannot parse');
+    expect(list.output).toContain('stripe');
+  });
+
+  it('permissions explain reports decisions and suggested allow rules', async () => {
+    const dir = await makeProject(`extensions:
+  stripe:
+    permissions:
+      allow:
+        - resources: [customers]
+          methods: [GET]
+`);
+    const allowed = gmResult(dir, 'permissions', 'explain', 'stripe', 'api', 'customers', 'GET');
+    expect(allowed.status).toBe(0);
+    expect(allowed.output).toContain('allow stripe api customers GET');
+    expect(allowed.output).toContain('winning rule');
+
+    const denied = gmResult(dir, 'permissions', 'explain', 'stripe', 'api', 'charges', 'GET');
+    expect(denied.status).toBe(4);
+    expect(denied.output).toContain('deny stripe api charges GET');
+    expect(denied.output).toContain('suggested allow rule');
   });
 });

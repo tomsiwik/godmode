@@ -10,6 +10,16 @@ interface RequestOptions {
   dryRun?: boolean;
 }
 
+export class HttpStatusError extends Error {
+  constructor(
+    public readonly status: number,
+    public readonly statusText: string,
+    body: string,
+  ) {
+    super(body || `${status} ${statusText}`);
+  }
+}
+
 export async function executeToString(manifest: Manifest, match: Match, options: RequestOptions): Promise<string> {
   const baseUrl = manifest.config.url;
   if (!baseUrl) {
@@ -83,7 +93,7 @@ export async function executeToString(manifest: Manifest, match: Match, options:
     result = text;
   }
 
-  if (!response.ok) throw new Error(result);
+  if (!response.ok) throw new HttpStatusError(response.status, response.statusText, result);
   return result;
 }
 
@@ -92,6 +102,13 @@ export async function execute(manifest: Manifest, match: Match, options: Request
     const result = await executeToString(manifest, match, options);
     if (result) process.stdout.write(result + '\n');
   } catch (err: any) {
+    if (err instanceof HttpStatusError) {
+      process.stderr.write(`${err.status} ${err.statusText}\n`);
+      if (err.message) process.stderr.write(err.message + '\n');
+      if (err.status >= 400 && err.status < 500) process.exit(10);
+      if (err.status >= 500) process.exit(11);
+      process.exit(12);
+    }
     process.stderr.write(err.message + '\n');
     process.exit(1);
   }

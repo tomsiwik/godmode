@@ -9,6 +9,7 @@ import type { Manifest } from 'godmode/spec';
 export interface McpRuntime {
   godmodeHome: string;
   loadManifest: (name: string) => Promise<Manifest>;
+  checkPermission?: (input: { extension: string; resource: string; method: string }) => { allowed: boolean; reason?: string };
 }
 
 export async function runMcp(rt: McpRuntime, args: string[]) {
@@ -60,5 +61,5 @@ For spec-based extensions, serves routes as MCP tools.`);
   // Fallback: generic MCP from manifest
   const manifest = await rt.loadManifest(name);
   const { serveMcp } = await import('./server.js');
-  await serveMcp(manifest, { filter, method });
+  await serveMcp(manifest, { filter, method, checkPermission: rt.checkPermission });
 }
