@@ -7,9 +7,9 @@ import { mkdtemp } from 'node:fs/promises';
 import { gmIn, gmResult } from './adapter';
 
 describe('npm extension install', () => {
-  async function makePackage() {
+  async function makePackage(folderName = 'pkg') {
     const root = await mkdtemp(resolve(tmpdir(), 'godmode-npm-ext-'));
-    const pkg = resolve(root, 'pkg');
+    const pkg = resolve(root, folderName);
     await mkdir(pkg, { recursive: true });
     await writeFile(resolve(pkg, 'package.json'), JSON.stringify({
       name: '@example/godmode-widget',
@@ -63,5 +63,38 @@ describe('npm extension install', () => {
     expect(uninstall.status).toBe(0);
     expect(gmIn(root, 'ext', 'list')).not.toContain('widget');
     expect(existsSync(packageDir)).toBe(false);
+  });
+
+  it('installs local package paths that contain spaces without shell splitting', async () => {
+    const { root, pkg } = await makePackage('pkg with spaces');
+
+    const install = gmResult(root, 'ext', 'install', pkg);
+    expect(install.status).toBe(0);
+    expect(install.output).toContain('Registered "widget"');
+    expect(gmIn(root, 'widget', 'api', 'GET', 'widgets', '--dry-run')).toContain(
+      'GET https://widget.example.test/v1/widgets',
+    );
+  });
+
+  it('does not delete outside node_modules when an installed manifest is tampered with', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'godmode-npm-ext-'));
+    const victim = resolve(root, 'victim');
+    await mkdir(resolve(root, '.godmode', 'extensions'), { recursive: true });
+    await mkdir(victim, { recursive: true });
+    await writeFile(resolve(victim, 'keep.txt'), 'keep');
+    await writeFile(resolve(root, '.godmode', 'extensions', 'evil.json'), JSON.stringify({
+      name: 'Evil',
+      slug: 'evil',
+      description: '',
+      source: 'npm',
+      packageName: '../victim',
+      interfaces: {},
+    }));
+
+    const uninstall = gmResult(root, 'ext', 'uninstall', 'evil');
+    expect(uninstall.status).not.toBe(0);
+    expect(uninstall.output).toContain('Invalid npm package name');
+    expect(existsSync(victim)).toBe(true);
+    expect(existsSync(resolve(root, '.godmode', 'extensions', 'evil.json'))).toBe(true);
   });
 });

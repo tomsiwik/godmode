@@ -13,8 +13,9 @@ import { showHelp, showApiHelp, showExtensionOverview, showExtensionVersion, sho
 import { runAgentCommand } from '@godmode-cli/command-agent';
 import { getInterface } from './interfaces.js';
 import { EXIT_CODES } from './exit-codes.js';
-import { explainPermission, suggestedAllowRule } from './permissions.js';
+import { explainPermission, resourceFromRawPath, resourceFromSegments, suggestedAllowRule } from './permissions.js';
 import { warnSettingsErrors } from './settings.js';
+import { matchRoute } from '@godmode-cli/interface-api/match';
 
 loadEnv();
 
@@ -292,7 +293,7 @@ async function runPermissions(rest: string[]) {
       process.exit(EXIT_CODES.usage);
     }
     const method = iface === 'mcp' ? 'mcp' : (maybeMethod || 'GET');
-    const resource = target.replace(/^\/+/, '').replace(/\//g, '.').replace(/^v\d+\./i, '') || '*';
+    const resource = await explainResource(extension, iface, target, method);
     const decision = explainPermission({ extension, resource, method });
     console.log(`${decision.allowed ? 'allow' : 'deny'} ${extension} ${iface} ${target} ${method.toUpperCase()}`);
     if (decision.reason) console.log(decision.reason);
@@ -309,6 +310,30 @@ async function runPermissions(rest: string[]) {
   process.stderr.write(`Unknown permissions command '${cmd}'.\n`);
   process.stderr.write(`Try 'godmode permissions --help' for more information.\n`);
   process.exit(EXIT_CODES.usage);
+}
+
+async function explainResource(extension: string, iface: string, target: string, method: string): Promise<string> {
+  if (iface === 'mcp') return target;
+  if (iface === 'api' || iface === 'graphql') {
+    try {
+      const manifest = await loadManifest(extension, iface);
+      const normalizedMethod = method.toLowerCase();
+      if (target.startsWith('/')) {
+        const exact = manifest.routes.find((route) => route.method === normalizedMethod && route.path === target);
+        if (exact) return resourceFromSegments(exact.segments);
+      }
+      const segments = target
+        .replace(/^\/+/, '')
+        .split(/[/.]/)
+        .filter(Boolean);
+      const match = matchRoute(manifest, segments, normalizedMethod);
+      if (match) return resourceFromSegments(match.route.segments);
+      return resourceFromRawPath(target);
+    } catch {
+      return target.replace(/^\/+/, '').replace(/\//g, '.').replace(/^v\d+\./i, '') || '*';
+    }
+  }
+  return target.replace(/^\/+/, '').replace(/\//g, '.').replace(/^v\d+\./i, '') || '*';
 }
 
 // ── interface dispatch ──

@@ -160,4 +160,22 @@ describe('permissions', () => {
     expect(denied.output).toContain('deny stripe api charges GET');
     expect(denied.output).toContain('suggested allow rule');
   });
+
+  it('permissions explain uses route resources for raw parameterized paths', async () => {
+    const dir = await makeProject(`extensions:
+  stripe:
+    permissions:
+      allow:
+        - resources: [customers]
+          methods: [DELETE]
+`);
+    const allowed = gmResult(dir, 'permissions', 'explain', 'stripe', 'api', '/v1/customers/cus_123', 'DELETE');
+    expect(allowed.status).toBe(0);
+    expect(allowed.output).toContain('allow stripe api /v1/customers/cus_123 DELETE');
+    expect(allowed.output).toContain('resources=[customers]');
+
+    const denied = gmResult(dir, 'permissions', 'explain', 'stripe', 'api', '/v1/charges/ch_123', 'GET');
+    expect(denied.status).toBe(4);
+    expect(denied.output).toContain('resources: [charges.ch_123]');
+  });
 });

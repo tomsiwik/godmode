@@ -1,8 +1,8 @@
-import { resolve, basename, dirname, extname, isAbsolute, parse as parsePath } from 'node:path';
+import { resolve, basename, dirname, extname, isAbsolute, parse as parsePath, relative } from 'node:path';
 import { homedir } from 'node:os';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile, readdir, unlink, access, rename, rm } from 'node:fs/promises';
-import { execSync } from 'node:child_process';
+import { execFileSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
 import {
   compileInterface,
@@ -38,6 +38,29 @@ function assertInstallableSlug(slug: string): void {
   if (!RESERVED_SLUGS.has(slug)) return;
   throw new Error(
     `'${slug}' is a reserved extension slug and cannot be installed.\nReserved: ${[...RESERVED_SLUGS].join(', ')}.`,
+  );
+}
+
+function isValidNpmPackageName(packageName: string): boolean {
+  return /^(?:@[a-z0-9._-]+\/)?[a-z0-9._-]+$/.test(packageName);
+}
+
+function assertContained(parent: string, child: string, label: string): string {
+  const root = resolve(parent);
+  const target = resolve(child);
+  const rel = relative(root, target);
+  if (rel === '' || (!rel.startsWith('..') && !isAbsolute(rel))) return target;
+  throw new Error(`${label} resolves outside ${root}`);
+}
+
+function packageInstallDir(scopeRoot: string, packageName: string): string {
+  if (!isValidNpmPackageName(packageName)) {
+    throw new Error(`Invalid npm package name in installed manifest: ${packageName}`);
+  }
+  return assertContained(
+    resolve(scopeRoot, 'node_modules'),
+    resolve(scopeRoot, 'node_modules', packageName),
+    `Package path for ${packageName}`,
   );
 }
 
@@ -188,7 +211,7 @@ async function loadSourceFromPackageDir(pkgDir: string): Promise<ManifestSource 
   if (!manifestPath) {
     throw new Error(`${pkgPath}: missing exports["./manifest"]`);
   }
-  const loaded = await loadSourceFromFile(resolve(pkgDir, manifestPath));
+  const loaded = await loadSourceFromFile(assertContained(pkgDir, resolve(pkgDir, manifestPath), 'Manifest export'));
   if (!loaded) {
     throw new Error(`${pkgPath}: exports["./manifest"] does not point to a readable manifest`);
   }
@@ -284,13 +307,13 @@ export async function addApi(input: string, scope: Scope = 'project') {
 
   process.stderr.write(`Installing ${name} [${scope}]...\n`);
   try {
-    execSync(`npm install ${installTarget} --prefix ${scopeRoot}`, { stdio: 'pipe' });
+    execFileSync('npm', ['install', installTarget, '--prefix', scopeRoot], { stdio: 'pipe' });
   } catch (e: unknown) {
     const err = e as { stderr?: { toString(): string }; message?: string };
     throw new Error(`Failed to install ${name}: ${err.stderr?.toString().trim() || err.message}`);
   }
 
-  const pkgDir = resolve(scopeRoot, 'node_modules', packageName);
+  const pkgDir = packageInstallDir(scopeRoot, packageName);
   const packageSource = await loadSourceFromPackageDir(pkgDir).catch((error: unknown) => {
     const mcpConfigPath = resolve(pkgDir, '.mcp.json');
     if (existsSync(mcpConfigPath)) return null;
@@ -346,23 +369,30 @@ export async function removeApi(name: string, scope?: Scope) {
     process.stderr.write(`Extension "${name}" not found\n`);
     process.exit(1);
   }
+  const manifestPath = resolve(dir, `${name}.json`);
+  let manifestText: string;
   try {
-    const manifestPath = resolve(dir, `${name}.json`);
-    let packageName: string | undefined;
-    try {
-      const multi = JSON.parse(await readFile(manifestPath, 'utf-8')) as MultiManifest;
-      packageName = multi.packageName;
-    } catch {}
-    await unlink(manifestPath);
-    if (packageName) {
-      const scopeRoot = resolvedScope === 'global' ? GODMODE_HOME : dirname(dir);
-      await rm(resolve(scopeRoot, 'node_modules', packageName), { recursive: true, force: true });
-    }
-    process.stderr.write(`Removed "${name}" [${resolvedScope}]\n`);
+    manifestText = await readFile(manifestPath, 'utf-8');
   } catch {
     process.stderr.write(`Extension "${name}" not found\n`);
     process.exit(1);
   }
+  let packageName: string | undefined;
+  try {
+    const multi = JSON.parse(manifestText) as MultiManifest;
+    packageName = multi.packageName;
+  } catch {}
+  const packageDir = packageName
+    ? packageInstallDir(resolvedScope === 'global' ? GODMODE_HOME : dirname(dir), packageName)
+    : null;
+  try {
+    await unlink(manifestPath);
+  } catch {
+    process.stderr.write(`Extension "${name}" not found\n`);
+    process.exit(1);
+  }
+  if (packageDir) await rm(packageDir, { recursive: true, force: true });
+  process.stderr.write(`Removed "${name}" [${resolvedScope}]\n`);
 }
 
 /** Returns the scope in which `name` is installed, preferring project.
