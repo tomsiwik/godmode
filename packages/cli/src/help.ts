@@ -18,6 +18,7 @@ import {
   type HelpPageData,
 } from '@godmode-cli/cli';
 import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
+import { BUILTINS } from './builtins.js';
 
 // Re-exports so consumers that imported these from 'godmode/help' keep working.
 export { HelpPage, renderSections, printTable, USE_COLOR, RESET, RED, DIM, ITALIC, GREEN, visibleLength, wrapText, authMissingLabel };
@@ -176,10 +177,7 @@ export class RootHelp extends HelpPage {
   }
   sections() {
     return [
-      { title: 'Built-in extensions:', rows: [
-        ['ext', 'Install and manage godmode extensions'],
-        ['agent', 'Coding-agent workflows'],
-      ] as string[][] },
+      { title: 'Built-in extensions:', rows: [...BUILTINS].map(([slug, b]) => [slug, b.description]) },
       { title: 'Options:', rows: ROOT_OPTION_ROWS as string[][] },
     ];
   }
@@ -206,6 +204,9 @@ export class ExtHelp extends HelpPage {
         ['update <name>', 'Re-fetch spec, rebuild routes'],
         ['list', 'Show installed extensions'],
         ['create', 'Interactive manifest wizard'],
+      ] as string[][] },
+      { title: 'Options:', rows: [
+        ['-g, --global', 'Apply to ~/.godmode (default: <cwd>/.godmode)'],
       ] as string[][] },
     ];
   }

@@ -12,6 +12,7 @@ import {
   type ManifestSource,
   type MultiManifest,
 } from './spec.js';
+import { BUILTINS } from './builtins.js';
 
 /** Global config directory — always `~/.godmode`. */
 export const GODMODE_HOME = resolve(homedir(), '.godmode');
@@ -21,23 +22,27 @@ export const GODMODE_HOME = resolve(homedir(), '.godmode');
 export type Scope = 'project' | 'global';
 
 const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
-const RESERVED_SLUGS = new Set([
-  'ext',
-  'extension',
-  'agent',
-  'script',
-  'workflow',
-  'history',
-  'sessions',
-  'trace',
-  'auth',
-  'permissions',
-]);
 
-function assertInstallableSlug(slug: string): void {
-  if (!RESERVED_SLUGS.has(slug)) return;
+/** A slug is occupied by whichever extension registered it: built-ins ship
+ *  registered, installed extensions register on install. Re-installing the
+ *  same extension (same package, or a local manifest) is an update and OK. */
+function assertSlugFree(slug: string, scope: Scope, packageName?: string): void {
+  if (BUILTINS.has(slug)) {
+    throw new Error(`'${slug}' is a built-in godmode extension; its slug is always in use.`);
+  }
+  const dir = scopeExtensionsDirSync(scope);
+  if (!dir) return;
+  const manifestPath = resolve(dir, `${slug}.json`);
+  if (!existsSync(manifestPath)) return;
+  let existing: MultiManifest;
+  try {
+    existing = JSON.parse(readFileSync(manifestPath, 'utf-8')) as MultiManifest;
+  } catch {
+    return;
+  }
+  if (existing.packageName === packageName) return;
   throw new Error(
-    `'${slug}' is a reserved extension slug and cannot be installed.\nReserved: ${[...RESERVED_SLUGS].join(', ')}.`,
+    `'${slug}' is already in use by ${existing.packageName || 'an installed extension'}.\nRun 'godmode ext uninstall ${slug}' first.`,
   );
 }
 
@@ -256,7 +261,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
 
   if (resolved) {
     const { name, source } = resolved;
-    assertInstallableSlug(source.slug || name);
+    assertSlugFree(source.slug || name, scope);
     const ifaceKeys = Object.keys(source.interfaces).filter((k) =>
       INTERFACE_KEYS.includes(k as InterfaceKey),
     ) as InterfaceKey[];
@@ -300,7 +305,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
     : null;
   const packageName = inputPackageJson?.name || (input.startsWith('@') ? input : `@godmode-cli/${input}`);
   const name = resolved?.name || (input.startsWith('@') ? basename(input) : input);
-  assertInstallableSlug(name);
+  assertSlugFree(name, scope, packageName);
   const installTarget = resolved?.dir && (await exists(resolve(resolved.dir, 'package.json')))
     ? resolved.dir
     : inputPackageJson ? asPath : packageName;
@@ -321,7 +326,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
   });
   if (packageSource) {
     const slug = packageSource.slug || name;
-    assertInstallableSlug(slug);
+    if (slug !== name) assertSlugFree(slug, scope, packageName);
     const ifaceKeys = Object.keys(packageSource.interfaces).filter((k) =>
       INTERFACE_KEYS.includes(k as InterfaceKey),
     ) as InterfaceKey[];
@@ -355,7 +360,10 @@ export async function updateApi(name: string, scope?: Scope) {
     process.stderr.write(`Extension "${name}" not found\n`);
     process.exit(1);
   }
-  await addApi(name, resolvedScope);
+  // Reinstall from the recorded package when the extension came from npm,
+  // so scoped/third-party packages update from the right source.
+  const existing = findInstalledManifestSync(name);
+  await addApi(existing?.packageName ?? name, resolvedScope);
 }
 
 export async function removeApi(name: string, scope?: Scope) {
