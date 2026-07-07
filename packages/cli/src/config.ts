@@ -13,6 +13,7 @@ import {
   type MultiManifest,
 } from './spec.js';
 import { BUILTINS } from './builtins.js';
+import { generateSkill } from './skill.js';
 
 /** Global config directory — always `~/.godmode`. */
 export const GODMODE_HOME = resolve(homedir(), '.godmode');
@@ -21,7 +22,7 @@ export const GODMODE_HOME = resolve(homedir(), '.godmode');
  *  upward from cwd; `global` = `~/.godmode`. */
 export type Scope = 'project' | 'global';
 
-const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
+const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp', 'command', 'orchestrator'] as const;
 
 /** A slug is occupied by whichever extension registered it: built-ins ship
  *  registered, installed extensions register on install. Re-installing the
@@ -160,7 +161,44 @@ function validateSource(raw: unknown, origin: string): ManifestSource {
       );
     }
   }
+  if (m.interfaces.command) validateCommandSource(m.interfaces.command, origin);
+  if (m.interfaces.orchestrator) validateOrchestratorSource(m.interfaces.orchestrator, origin);
   return m as ManifestSource;
+}
+
+function validateCommandSource(config: { commands?: unknown }, origin: string): void {
+  const commands = config.commands;
+  if (!Array.isArray(commands) || commands.length === 0) {
+    throw new Error(`${origin}: interfaces.command.commands is required`);
+  }
+  commands.forEach((route: any, index: number) => {
+    if (!nonEmptyString(route?.name)) throw new Error(`${origin}: interfaces.command.commands[${index}].name is required`);
+    if (!nonEmptyString(route?.command)) throw new Error(`${origin}: interfaces.command.commands[${index}].command is required`);
+    if (route.args !== undefined && (!Array.isArray(route.args) || route.args.some((arg: unknown) => typeof arg !== 'string'))) {
+      throw new Error(`${origin}: interfaces.command.commands[${index}].args must be an array of strings`);
+    }
+  });
+}
+
+function validateOrchestratorSource(config: { calls?: unknown }, origin: string): void {
+  const calls = config.calls;
+  if (!Array.isArray(calls) || calls.length === 0) {
+    throw new Error(`${origin}: interfaces.orchestrator.calls is required`);
+  }
+  calls.forEach((route: any, index: number) => {
+    if (!nonEmptyString(route?.name)) throw new Error(`${origin}: interfaces.orchestrator.calls[${index}].name is required`);
+    if (Array.isArray(route?.call)) {
+      if (route.call.length === 0 || route.call.some((call: unknown) => !nonEmptyString(call))) {
+        throw new Error(`${origin}: interfaces.orchestrator.calls[${index}].call must contain non-empty commands`);
+      }
+      return;
+    }
+    if (!nonEmptyString(route?.call)) throw new Error(`${origin}: interfaces.orchestrator.calls[${index}].call is required`);
+  });
+}
+
+function nonEmptyString(value: unknown): value is string {
+  return typeof value === 'string' && value.trim().length > 0;
 }
 
 async function loadSourceFromDir(dir: string): Promise<ManifestSource | null> {
@@ -186,18 +224,13 @@ async function loadSourceFromFile(filePath: string): Promise<{ source: ManifestS
 }
 
 function absolutizeSource(source: ManifestSource, dir: string): ManifestSource {
-  const interfaces: ManifestSource['interfaces'] = {};
-  if (source.interfaces.api) interfaces.api = { ...source.interfaces.api };
-  if (source.interfaces.graphql) interfaces.graphql = { ...source.interfaces.graphql };
-  if (source.interfaces.mcp) interfaces.mcp = { ...source.interfaces.mcp };
-  const next: ManifestSource = {
-    ...source,
-    interfaces,
-  };
+  const next: ManifestSource = { ...source, interfaces: { ...source.interfaces } };
   for (const iface of ['api', 'graphql'] as const) {
-    const spec = next.interfaces[iface]?.spec;
-    if (spec && !/^[a-z][a-z0-9+.-]*:/i.test(spec) && !isAbsolute(spec)) {
-      next.interfaces[iface]!.spec = resolve(dir, spec);
+    const entry = next.interfaces[iface];
+    if (!entry) continue;
+    next.interfaces[iface] = { ...entry };
+    if (entry.spec && !/^[a-z][a-z0-9+.-]*:/i.test(entry.spec) && !isAbsolute(entry.spec)) {
+      next.interfaces[iface]!.spec = resolve(dir, entry.spec);
     }
   }
   return next;
@@ -257,11 +290,18 @@ async function resolveSource(input: string): Promise<{ name: string; source: Man
 export async function addApi(input: string, scope: Scope = 'project') {
   const extensionsDir = await ensureScopeDir(scope);
 
-  const resolved = await resolveSource(input).catch(() => null);
+  // Only "nothing to resolve" falls through to the npm path — a manifest
+  // that exists but fails validation should surface its error, not be
+  // retried as a package name.
+  const resolved = await resolveSource(input).catch((error: unknown) => {
+    if (error instanceof Error && error.message.startsWith('No manifest found')) return null;
+    throw error;
+  });
 
   if (resolved) {
     const { name, source } = resolved;
-    assertSlugFree(source.slug || name, scope);
+    const slug = source.slug || name;
+    assertSlugFree(slug, scope);
     const ifaceKeys = Object.keys(source.interfaces).filter((k) =>
       INTERFACE_KEYS.includes(k as InterfaceKey),
     ) as InterfaceKey[];
@@ -269,7 +309,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
     if (ifaceKeys.length > 0) {
       const multi: MultiManifest = {
         name: source.name,
-        slug: source.slug || name,
+        slug,
         description: source.description || '',
         source: 'local',
         auth: source.auth,
@@ -283,6 +323,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
       }
 
       await writeFile(resolve(extensionsDir, `${name}.json`), JSON.stringify(multi, null, 2));
+      await writeFile(resolve(extensionsDir, `${name}.SKILL.md`), generateSkill(multi));
 
       const ifaceSummary = ifaceKeys
         .map((k) => {
@@ -345,6 +386,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
       (multi.interfaces as Record<string, unknown>)[iface] = data;
     }
     await writeFile(resolve(extensionsDir, `${slug}.json`), JSON.stringify(multi, null, 2));
+    await writeFile(resolve(extensionsDir, `${slug}.SKILL.md`), generateSkill(multi));
     process.stderr.write(`Registered "${slug}" [${scope}] from ${packageName}\n`);
   } else if (await exists(resolve(pkgDir, '.mcp.json'))) {
     process.stderr.write(`Installed "${name}" (MCP server extension)\n`);
@@ -400,6 +442,8 @@ export async function removeApi(name: string, scope?: Scope) {
     process.exit(1);
   }
   if (packageDir) await rm(packageDir, { recursive: true, force: true });
+  const skillPath = resolve(dir, `${name}.SKILL.md`);
+  if (await exists(skillPath)) await unlink(skillPath);
   process.stderr.write(`Removed "${name}" [${resolvedScope}]\n`);
 }
 
@@ -501,6 +545,17 @@ export function findInstalledManifestSync(name: string): MultiManifest | null {
     } catch {
       return null;
     }
+  }
+  return null;
+}
+
+export async function readInstalledSkill(name: string): Promise<string | null> {
+  for (const scope of ['project', 'global'] as const) {
+    const dir = scopeExtensionsDirSync(scope);
+    if (!dir) continue;
+    const path = resolve(dir, `${name}.SKILL.md`);
+    if (!existsSync(path)) continue;
+    return readFile(path, 'utf-8');
   }
   return null;
 }

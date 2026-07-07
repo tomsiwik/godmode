@@ -1,5 +1,7 @@
 import type { ApiConfig, Manifest, Route } from 'godmode/spec';
 import { AuthStrategy } from '@godmode-cli/cli';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { StdioClientTransport } from '@modelcontextprotocol/sdk/client/stdio.js';
 
 // ── MCP JSON-RPC client ─────────────────────────────────────
 
@@ -197,6 +199,10 @@ export async function executeMcpTool(
     if (options.dryRun) return '';
   }
 
+  if (config.url?.startsWith('stdio:')) {
+    return executeStdioMcpTool(config.url, toolName, args);
+  }
+
   // Initialize session
   const init = await mcpRequest(config.url, 'initialize', {
     protocolVersion: '2025-03-26',
@@ -234,4 +240,67 @@ export async function executeMcpTool(
   }
 
   return JSON.stringify(result.result, null, 2);
+}
+
+async function executeStdioMcpTool(
+  url: string,
+  toolName: string,
+  args: Record<string, string>,
+): Promise<string> {
+  const server = stdioServerFromUrl(url);
+  const transport = new StdioClientTransport({ ...server, stderr: 'pipe' });
+  const client = new Client({ name: 'godmode', version: '0.0.1' }, { capabilities: {} });
+  const stderr: Buffer[] = [];
+  transport.stderr?.on('data', (chunk) => stderr.push(Buffer.from(chunk)));
+
+  try {
+    await client.connect(transport);
+    const result = await client.callTool({ name: toolName, arguments: args });
+    const content = 'content' in result ? result.content : undefined;
+    if (Array.isArray(content)) {
+      return content
+        .filter((c: any) => c.type === 'text')
+        .map((c: any) => c.text)
+        .join('\n');
+    }
+    return JSON.stringify(result, null, 2);
+  } catch (error) {
+    const details = Buffer.concat(stderr).toString('utf-8').trim();
+    const message = (error as Error).message;
+    throw new Error(details ? `${message}\n${details}` : message);
+  } finally {
+    await client.close().catch(() => undefined);
+  }
+}
+
+function stdioServerFromUrl(url: string): { command: string; args: string[] } {
+  const spec = url.slice('stdio:'.length).trim();
+  const argv = splitCommandLine(spec);
+  if (!argv.length) throw new Error('stdio MCP URL must include a package or command');
+  const [entry, ...rest] = argv;
+  if (looksLikePackageName(entry)) {
+    return { command: 'npx', args: ['--yes', entry, ...rest] };
+  }
+  return { command: entry, args: rest };
+}
+
+function looksLikePackageName(value: string): boolean {
+  if (value.startsWith('@')) return true;
+  if (['node', 'npx', 'npm', 'pnpm', 'yarn', 'bun', 'deno', 'python', 'python3'].includes(value)) {
+    return false;
+  }
+  return !value.startsWith('.')
+    && !value.startsWith('/')
+    && !value.includes('/')
+    && !value.includes('\\');
+}
+
+function splitCommandLine(input: string): string[] {
+  const out: string[] = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(input)) !== null) {
+    out.push(match[1] ?? match[2] ?? match[3]);
+  }
+  return out;
 }

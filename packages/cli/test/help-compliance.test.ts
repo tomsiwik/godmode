@@ -1,15 +1,15 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdtempSync, mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { rootHelpRules, subHelpRules, versionRules, type Rule } from '../src/help-rules.js';
 
 const CLI = resolve(__dirname, '..', 'dist', 'index.js');
-const GODMODE_HOME =
-  process.platform === 'linux' && process.env.XDG_CONFIG_HOME
-    ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
-    : resolve(homedir(), '.godmode');
+const TEST_HOME = mkdtempSync(resolve(tmpdir(), 'godmode-help-compliance-'));
+process.env.HOME = TEST_HOME;
+delete process.env.XDG_CONFIG_HOME;
+const GODMODE_HOME = resolve(TEST_HOME, '.godmode');
 
 function gm(...args: string[]): string {
   try {
@@ -23,7 +23,7 @@ function gm(...args: string[]): string {
 }
 
 function extRegistered(name: string): boolean {
-  return existsSync(resolve(GODMODE_HOME, 'apis', `${name}.json`));
+  return existsSync(resolve(GODMODE_HOME, 'extensions', `${name}.json`));
 }
 
 function assertRule(output: string, rule: Rule, label: string) {
@@ -50,6 +50,35 @@ const EXTENSIONS = [
   { name: 'slack', iface: 'api' },
   { name: 'stripe', iface: 'api' },
 ] as const;
+
+mkdirSync(resolve(GODMODE_HOME, 'extensions'), { recursive: true });
+for (const { name, iface } of EXTENSIONS) {
+  writeFileSync(resolve(GODMODE_HOME, 'extensions', `${name}.json`), JSON.stringify({
+    name,
+    slug: name,
+    description: `${name} test fixture`,
+    auth: { env: `${name.toUpperCase().replace(/[^A-Z0-9]/g, '_')}_TOKEN`, type: 'bearer' },
+    interfaces: {
+      [iface]: {
+        type: iface,
+        specVersion: 'test',
+        url: iface === 'mcp' ? 'https://example.com/mcp' : 'https://example.com',
+        versions: [],
+        resourceDescriptions: { sample: 'Sample resource.' },
+        routes: [{
+          path: 'sample',
+          method: iface === 'api' ? 'get' : 'post',
+          summary: 'Sample route',
+          version: '',
+          segments: [{ value: 'sample', isParam: false }],
+        }],
+        ...(iface === 'mcp'
+          ? { _mcpTools: [{ name: 'sample', description: 'Sample route', inputSchema: { type: 'object', properties: {} } }] }
+          : {}),
+      },
+    },
+  }, null, 2));
+}
 
 // ── --version ──────────────────────────────────────────────
 
