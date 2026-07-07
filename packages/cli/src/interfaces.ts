@@ -16,8 +16,15 @@ import { runMcp } from '@godmode-cli/interface-mcp/command';
 import type { ParsedArgs } from './args.js';
 import { readStdin } from './args.js';
 import { loadManifest, GODMODE_HOME } from './config.js';
+import { EXIT_CODES } from './exit-codes.js';
 import { showApiHelp } from './help.js';
-import { checkPermission, resourceFromSegments, resourceFromTool } from './permissions.js';
+import {
+  checkPermission,
+  resourceFromRawPath,
+  resourceFromSegments,
+  resourceFromTool,
+  suggestedAllowRule,
+} from './permissions.js';
 import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
 
 interface InterfaceCtx {
@@ -70,6 +77,18 @@ async function executeRoute(ctx: InterfaceCtx): Promise<void> {
   // Raw-path escape hatch: `godmode stripe api /v1/customers`.
   if (parsed.segments[0]?.startsWith('/')) {
     const rawPath = parsed.segments[0];
+    const route = manifest.routes.find((r) => r.method === parsed.method && r.path === rawPath);
+    const resource = route ? resourceFromSegments(route.segments) : resourceFromRawPath(rawPath);
+    const check = checkPermission({
+      extension: extensionName,
+      resource,
+      method: parsed.method,
+    });
+    if (!check.allowed) {
+      process.stderr.write(`Blocked: ${check.reason}\n`);
+      process.stderr.write(`Suggested allow rule:\n${suggestedAllowRule({ extension: extensionName, resource, method: parsed.method })}\n`);
+      process.exit(EXIT_CODES.permissionDenied);
+    }
     const syntheticRoute: Route = {
       path: rawPath, method: parsed.method, summary: '', version: '', segments: [],
     };
@@ -83,7 +102,7 @@ async function executeRoute(ctx: InterfaceCtx): Promise<void> {
   const match = matchRoute(manifest, parsed.segments, parsed.method);
   if (!match) {
     reportNoMatch(ctx);
-    process.exit(1);
+    process.exit(EXIT_CODES.notFound);
   }
 
   const check = checkPermission({
@@ -93,7 +112,8 @@ async function executeRoute(ctx: InterfaceCtx): Promise<void> {
   });
   if (!check.allowed) {
     process.stderr.write(`Blocked: ${check.reason}\n`);
-    process.exit(1);
+    process.stderr.write(`Suggested allow rule:\n${suggestedAllowRule({ extension: extensionName, resource: resourceFromSegments(match.route.segments), method: parsed.method })}\n`);
+    process.exit(EXIT_CODES.permissionDenied);
   }
 
   await execute(manifest, match, {
@@ -162,7 +182,11 @@ export class McpInterface extends Interface {
     // Bare `godmode <ext> mcp` with no tool → serve as an MCP server.
     const { extensionName, rawRest } = this.ctx;
     await runMcp(
-      { godmodeHome: GODMODE_HOME, loadManifest: (n) => loadManifest(n, 'mcp') },
+      {
+        godmodeHome: GODMODE_HOME,
+        loadManifest: (n) => loadManifest(n, 'mcp'),
+        checkPermission,
+      },
       [extensionName, ...rawRest],
     );
   }
@@ -183,7 +207,8 @@ export class McpInterface extends Interface {
     });
     if (!check.allowed) {
       process.stderr.write(`Blocked: ${check.reason}\n`);
-      process.exit(1);
+      process.stderr.write(`Suggested allow rule:\n${suggestedAllowRule({ extension: extensionName, resource: resourceFromTool(tool), method: 'mcp' })}\n`);
+      process.exit(EXIT_CODES.permissionDenied);
     }
 
     const result = await executeMcpTool(manifest.config, tool, parsed.body, {

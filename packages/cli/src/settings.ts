@@ -45,6 +45,23 @@ export interface Settings {
   extensions?: Record<string, ExtensionSettings>;
 }
 
+export interface SettingsError {
+  path: string;
+  message: string;
+}
+
+export interface SettingsSource {
+  scope: 'global' | 'project';
+  path: string;
+  settings: Settings;
+}
+
+export interface LoadedSettings {
+  settings: Settings;
+  errors: SettingsError[];
+  sources: SettingsSource[];
+}
+
 // ── resolution ───────────────────────────────────────────────
 
 function findProjectGodmode(start: string = process.cwd()): string | null {
@@ -58,15 +75,14 @@ function findProjectGodmode(start: string = process.cwd()): string | null {
   }
 }
 
-function readSettingsFile(path: string): Settings {
-  if (!existsSync(path)) return {};
+function readSettingsFile(path: string): { settings: Settings; error?: SettingsError } {
+  if (!existsSync(path)) return { settings: {} };
   try {
     const raw = parseYaml(readFileSync(path, 'utf-8'));
-    return (raw ?? {}) as Settings;
+    return { settings: (raw ?? {}) as Settings };
   } catch (e: unknown) {
     const msg = (e as { message?: string }).message || String(e);
-    process.stderr.write(`Warning: could not parse ${path}: ${msg}\n`);
-    return {};
+    return { settings: {}, error: { path, message: msg } };
   }
 }
 
@@ -109,18 +125,39 @@ function mergeSettings(base: Settings, overlay: Settings): Settings {
 
 // ── public loader ────────────────────────────────────────────
 
-let cached: Settings | null = null;
+let cached: LoadedSettings | null = null;
 
-export function loadSettings(): Settings {
+export function loadSettingsDetailed(): LoadedSettings {
   if (cached) return cached;
   const globalPath = resolve(homedir(), '.godmode', 'settings.yaml');
   const projectRoot = findProjectGodmode();
   const projectPath = projectRoot ? resolve(projectRoot, 'settings.yaml') : null;
 
-  const globalSettings = readSettingsFile(globalPath);
-  const projectSettings = projectPath ? readSettingsFile(projectPath) : {};
-  cached = mergeSettings(globalSettings, projectSettings);
+  const globalResult = readSettingsFile(globalPath);
+  const projectResult = projectPath ? readSettingsFile(projectPath) : { settings: {} };
+  const sources: SettingsSource[] = [];
+  if (existsSync(globalPath)) sources.push({ scope: 'global', path: globalPath, settings: globalResult.settings });
+  if (projectPath && existsSync(projectPath)) sources.push({ scope: 'project', path: projectPath, settings: projectResult.settings });
+  cached = {
+    settings: mergeSettings(globalResult.settings, projectResult.settings),
+    errors: [globalResult.error, projectResult.error].filter(Boolean) as SettingsError[],
+    sources,
+  };
   return cached;
+}
+
+export function loadSettings(): Settings {
+  return loadSettingsDetailed().settings;
+}
+
+export function settingsErrorMessage(error: SettingsError): string {
+  return `cannot parse ${error.path}: ${error.message} - refusing to run with an unreadable policy.`;
+}
+
+export function warnSettingsErrors(): void {
+  for (const error of loadSettingsDetailed().errors) {
+    process.stderr.write(`Warning: ${settingsErrorMessage(error)}\n`);
+  }
 }
 
 /** For tests — clear memoized settings between fixture setups. */

@@ -132,9 +132,9 @@ describe('ExtHelp', () => {
       expect(out).toContain(cmd);
     }
   });
-  it('no Options block (nothing context-specific)', () => {
-    // Commands section is the only one — no Options section
-    expect(out).not.toMatch(/^Options:/m);
+  it('documents the -g, --global flag', () => {
+    expect(out).toMatch(/^Options:/m);
+    expect(out).toContain('-g, --global');
   });
 });
 

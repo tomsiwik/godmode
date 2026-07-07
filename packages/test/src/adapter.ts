@@ -114,9 +114,9 @@ export function testAdapter(name: string, configPath: string) {
     let cases: ReturnType<typeof buildTestCases>;
 
     beforeAll(() => {
-      const list = gm('setup', 'command', 'list');
+      const list = gm('ext', 'list');
       if (!list.includes(name)) {
-        const result = gm('setup', 'command', 'add', configPath);
+        const result = gm('ext', 'install', configPath);
         if (result.includes('Error') || result.includes('failed')) {
           throw new Error(`Failed to add ${name}: ${result}`);
         }

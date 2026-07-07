@@ -81,7 +81,7 @@ describe('start/send lifecycle', () => {
       throw new Error(`unexpected command: ${command} ${args.join(' ')}`);
     });
 
-    let code = await runAgentCommand(['start', '--harness', 'claude', '--model', 'sonnet', '--effort', 'high', 'Reply exactly ONE'], {
+    let code = await runAgentCommand(['start', '--harness=claude', '--model=sonnet', '--effort=high', 'Reply exactly ONE'], {
       executor,
       cwd,
       writer: { write: (chunk: string) => { writes.push(chunk); return true; } },

@@ -1,5 +1,5 @@
 import prompts from 'prompts';
-import { writeFileSync } from 'node:fs';
+import { mkdirSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { stringify } from 'yaml';
 
@@ -56,12 +56,16 @@ export async function configWizard() {
 
   const config: Record<string, any> = {
     name: response.name.charAt(0).toUpperCase() + response.name.slice(1),
-    type: 'api',
-    spec: response.spec,
+    slug: response.name.toLowerCase().replace(/[^a-z0-9-]/g, '-'),
+    interfaces: {
+      api: {
+        spec: response.spec,
+      },
+    },
   };
 
   if (response.description) config.description = response.description;
-  if (response.url) config.url = response.url;
+  if (response.url) config.interfaces.api.url = response.url;
   if (response.envVar) {
     config.auth = { env: response.envVar };
     if (response.authType && response.authType !== 'bearer') {
@@ -70,7 +74,8 @@ export async function configWizard() {
   }
 
   const yaml = stringify(config);
-  const filename = `${response.name.toLowerCase().replace(/[^a-z0-9]/g, '-')}.yaml`;
+  const dirname = response.name.toLowerCase().replace(/[^a-z0-9-]/g, '-');
+  const filename = `${dirname}/manifest.yaml`;
 
   console.log(`\n\x1b[2m${yaml}\x1b[0m`);
 
@@ -84,7 +89,8 @@ export async function configWizard() {
   if (!write) { console.log('Aborted.'); return; }
 
   const filepath = resolve(process.cwd(), filename);
+  mkdirSync(resolve(process.cwd(), dirname), { recursive: true });
   writeFileSync(filepath, yaml);
   console.log(`\nSaved ${filepath}`);
-  console.log(`Run \x1b[1mgodmode extension add ${response.name.toLowerCase()}\x1b[0m to register it.`);
+  console.log(`Run \x1b[1mgodmode ext install ./${dirname}\x1b[0m to register it.`);
 }

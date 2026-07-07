@@ -111,6 +111,8 @@ export interface MultiManifest {
   name: string;
   slug: string;
   description: string;
+  source?: 'local' | 'npm';
+  packageName?: string;
   auth?: AuthConfig;
   headers?: Record<string, string>;
   interfaces: {

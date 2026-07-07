@@ -5,9 +5,9 @@ export async function runAdd(args: string[], scope: Scope = 'project') {
     console.log(`Add an extension from a folder, built-in name, or manifest.
 
 Usage:
-  godmode extension add <name>          Built-in extension (e.g. stripe, github)
-  godmode extension add <folder>        Folder containing manifest.yaml
-  godmode extension add <manifest>      Direct path to manifest.yaml/json
+  godmode ext install <name>            Built-in extension (e.g. stripe, github)
+  godmode ext install <folder>          Folder containing manifest.yaml
+  godmode ext install <manifest>        Direct path to manifest.yaml/json
 
 Manifest format (manifest.yaml):
   slug:    stripe             CLI name
@@ -28,10 +28,10 @@ Types:
   mcp                         MCP endpoint  (requires url)
 
 Examples:
-  $ godmode extension add stripe
-  $ godmode extension add ./my-extension
-  $ godmode extension add ./my-extension/manifest.yaml
-  $ godmode extension add openai`);
+  $ godmode ext install stripe
+  $ godmode ext install ./my-extension
+  $ godmode ext install ./my-extension/manifest.yaml
+  $ godmode ext install openai`);
     process.exit(args[0] ? 0 : 1);
   }
   await addApi(args[0], scope);

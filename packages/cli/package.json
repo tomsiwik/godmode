@@ -26,6 +26,7 @@
   "exports": {
     "./spec": "./src/spec.ts",
     "./config": "./src/config.ts",
+    "./permissions": "./src/permissions.ts",
     "./help": "./src/help.ts"
   },
   "files": [

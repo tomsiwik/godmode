@@ -9,6 +9,7 @@ import { executeMcpTool } from './index.js';
 export interface McpServerOptions {
   filter?: string;
   method?: string;
+  checkPermission?: (input: { extension: string; resource: string; method: string }) => { allowed: boolean; reason?: string };
 }
 
 // ── tool naming ─────────────────────────────────────────────
@@ -127,6 +128,17 @@ export async function serveMcp(manifest: Manifest, options: McpServerOptions = {
 
     try {
       let result: string;
+      const extension = manifest.config.slug || manifest.name;
+      const resource = type === 'mcp'
+        ? resourceFromTool(toolName)
+        : resourceFromSegments(tool.route.segments);
+      const method = type === 'mcp' ? 'mcp' : tool.route.method;
+      if (options.checkPermission) {
+        const check = options.checkPermission({ extension, resource, method });
+        if (!check.allowed) {
+          return { content: [{ type: 'text' as const, text: `Blocked: ${check.reason}` }], isError: true };
+        }
+      }
 
       if (type === 'mcp') {
         result = await executeMcpTool(manifest.config, toolName, args, {});
@@ -152,4 +164,16 @@ export async function serveMcp(manifest: Manifest, options: McpServerOptions = {
   });
 
   await server.connect(new StdioServerTransport());
+}
+
+function resourceFromSegments(segments: Route['segments']): string {
+  const parts = segments
+    .filter((s) => !s.isParam)
+    .map((s) => s.value)
+    .filter((v) => !/^v\d+$/i.test(v));
+  return parts.join('.') || '*';
+}
+
+function resourceFromTool(toolName: string): string {
+  return toolName;
 }

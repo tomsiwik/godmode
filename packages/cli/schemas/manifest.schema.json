@@ -14,7 +14,7 @@
     },
     "slug": {
       "type": "string",
-      "description": "URL-safe identifier used as the CLI argument (e.g. 'stripe' in `godmode api stripe`). Defaults to `name` lowercased.",
+      "description": "URL-safe identifier used as the CLI argument (e.g. 'stripe' in `godmode stripe api`). Defaults to `name` lowercased.",
       "pattern": "^[a-z0-9][a-z0-9-]*$"
     },
     "description": {
