@@ -1,11 +1,23 @@
 import { parse as parseYaml } from 'yaml';
 import type { ApiConfig, Manifest, Route, Segment, VersionConfig } from 'godmode/spec';
+import { readFile } from 'node:fs/promises';
+import { isAbsolute, resolve } from 'node:path';
 
 export async function parseOpenApi(name: string, config: ApiConfig): Promise<Manifest> {
-  process.stderr.write(`Fetching ${config.spec}...\n`);
-  const res = await fetch(config.spec!);
-  if (!res.ok) throw new Error(`Failed to fetch spec: ${res.status} ${res.statusText}`);
-  const text = await res.text();
+  // Anything with a URI scheme (https:, data:, ...) is fetched; bare paths
+  // are read from disk.
+  const hasScheme = /^[a-z][a-z0-9+.-]*:/i.test(config.spec!);
+  let text: string;
+  if (hasScheme) {
+    process.stderr.write(`Fetching ${config.spec}...\n`);
+    const res = await fetch(config.spec!);
+    if (!res.ok) throw new Error(`Failed to fetch spec: ${res.status} ${res.statusText}`);
+    text = await res.text();
+  } else {
+    const specPath = isAbsolute(config.spec!) ? config.spec! : resolve(process.cwd(), config.spec!);
+    process.stderr.write(`Loading ${specPath}...\n`);
+    text = await readFile(specPath, 'utf-8');
+  }
 
   const isJson = text.trimStart().startsWith('{');
   const spec = isJson ? JSON.parse(text) : parseYaml(text);

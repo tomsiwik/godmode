@@ -56,6 +56,15 @@ export async function runExt(rest: string[]) {
     return;
   }
 
+  if (cmd === 'skill') {
+    if (!cmdArgs[0]) { console.error('Usage: godmode ext skill <name>'); process.exit(1); }
+    const { loadMultiManifest, readInstalledSkill } = await import('../config.js');
+    const { generateSkill } = await import('../skill.js');
+    const multi = await loadMultiManifest(cmdArgs[0]);
+    process.stdout.write(await readInstalledSkill(cmdArgs[0]) ?? generateSkill(multi));
+    return;
+  }
+
   const multi = findInstalledManifestSync(cmd);
   if (multi) {
     const ifaces = Object.keys(multi.interfaces) as InterfaceKey[];

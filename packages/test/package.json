@@ -29,6 +29,7 @@
     "build": "tsup src/adapter.ts --format esm --clean"
   },
   "dependencies": {
+    "godmode": "workspace:*",
     "vitest": "^4.1.5"
   },
   "devDependencies": {
