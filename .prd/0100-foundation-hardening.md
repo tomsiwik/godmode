@@ -1,18 +1,18 @@
 # 0100 — Foundation hardening & consistency
 
-**Status:** Draft · **Level:** Epic · **Depends on:** —
+**Status:** Draft · **Level:** Epic · **Depends on:** 0010
 
 ## Summary
 
-godmode's core promise — one grammar, one permission model, one sandbox permission — is
-undermined by a handful of defects: two full permission bypasses, a settings parser that
-fails open, a publishing story that doesn't work end to end, a scaffolding wizard that
-emits rejected output, and documentation that teaches commands which don't exist. This
-epic closes those gaps and converges the CLI, docs, and test suite onto one truthful
-surface. It is the prerequisite for every other epic: authoring (0200), registry trust
-(0800), and orchestration (0300) all assume the permission layer actually holds and that
-what the docs say is what the binary does. Nothing here adds new capability categories;
-it makes the existing ones honest, enforceable, and scriptable by agents.
+godmode's core promise — one grammar and one permission model — is undermined by a
+handful of defects: two full permission bypasses, a settings parser that fails open, a
+legacy-only MCP adapter, a publishing story that doesn't work end to end, a scaffolding
+wizard that emits rejected output, and documentation that teaches commands which don't
+exist. This epic closes those gaps and converges the CLI, docs, and test suite onto one
+truthful surface. It is the prerequisite for every other implementation epic: authoring
+(0200), registry trust (0800), auth (0900), and orchestration (0300) all assume the
+runtime contract in 0010 actually holds. Nothing here adds new capability categories;
+it makes the existing ones honest, enforceable, compatible, and scriptable by agents.
 
 ## Problem / Motivation
 
@@ -25,7 +25,7 @@ Current state, grounded in the codebase:
   permissions at all — the documented Claude Code setup runs fully unscoped.
 - A corrupt or unparseable `settings.yaml` logs a warning and returns empty settings
   (`packages/cli/src/settings.ts:61-71`), which the permission engine treats as
-  allow-all: the policy file failing to parse *removes* the policy.
+  allow-all: the policy file failing to parse _removes_ the policy.
 - Package-based (npm) extensions are invisible to the dispatcher and `ext list` because
   only compiled JSON manifests are read; `publishing.mdx` documents an
   `exports."./manifest"` contract the installer never consults. The entire npm ecosystem
@@ -36,6 +36,10 @@ Current state, grounded in the codebase:
   `apps/docs/content/extensions/github.mdx:9`).
 - HTTP 4xx/5xx responses exit 0 with no status surfaced unless `GODMODE_DEBUG` is set —
   agents scripting against exit codes cannot detect failure.
+- The MCP client hardcodes protocol `2025-03-26`, sends `initialize` and
+  `notifications/initialized`, carries `Mcp-Session-Id`, and imports tools only. The
+  modern 2026-07-28 protocol removed that handshake and requires per-request metadata
+  plus `server/discover`; godmode cannot currently claim compatibility with it.
 - Two parallel settings systems (`settings.yaml` for permissions, `settings.json` for
   agent defaults), a stale shared test adapter using the removed `setup command`
   grammar, compliance tests asserting against a legacy `apis/` directory so they
@@ -82,10 +86,14 @@ Foundation hardening makes five behavioural guarantees:
 5. **Introspectable policy.** A permissions CLI lets humans and agents list the
    effective policy, explain why a specific call was denied, and be guided into adding
    a scoped rule when blocked.
+6. **Truthful MCP compatibility.** The client and server support the modern 2026-07-28
+   request model, report unsupported capabilities explicitly, and retain separately
+   tested legacy interoperability rather than conflating protocol eras.
 
 ## Behaviour details
 
 ### Permission closure
+
 - `godmode <ext> api /raw/path` is evaluated against the same policy as the equivalent
   named route; a matching deny rule blocks it with the standard denial message and a
   distinct exit code.
@@ -96,18 +104,20 @@ Foundation hardening makes five behavioural guarantees:
   name, so `methods:`-style constraints are meaningful for MCP-backed extensions.
 
 ### Fail-closed settings
+
 - If any settings file in the resolution chain fails to parse, permissioned dispatch
   exits non-zero with `Error: cannot parse <path>: <reason> — refusing to run with an
-  unreadable policy.` Read-only, non-permissioned commands (`--help`, `--version`,
+unreadable policy.` Read-only, non-permissioned commands (`--help`, `--version`,
   `ext list`) still work and repeat the warning.
 - Agent-default settings move from `settings.json` into the same `settings.yaml`; on
   first run after upgrade, an existing `settings.json` is migrated automatically and
   the user is told what moved. Reading `settings.json` afterwards is not attempted.
 
 ### Publishing end to end
+
 - `godmode ext install <npm-name>` installs the package, reads its manifest export,
   compiles it, and registers the slug. `ext list` shows it with its source (`npm`).
-- `godmode ext uninstall <name>` removes the compiled manifest *and* the installed
+- `godmode ext uninstall <name>` removes the compiled manifest _and_ the installed
   package directory; a subsequent `ext list` shows no trace.
 - Package lookup respects project scope: a project-installed package extension is found
   when invoked from within that project.
@@ -115,6 +125,7 @@ Foundation hardening makes five behavioural guarantees:
   listing the reserved namespace.
 
 ### Wizard fix
+
 - `godmode ext create` emits the current nested manifest format into
   `<dir>/manifest.yaml`, and its closing hint prints the real command
   (`godmode ext install ./<dir>`). Installing the generated manifest succeeds without
@@ -122,6 +133,7 @@ Foundation hardening makes five behavioural guarantees:
   not-broken.)
 
 ### Exit codes & error classes
+
 - Distinct, documented exit codes distinguish at minimum: success; upstream HTTP 4xx;
   upstream HTTP 5xx; permission denied; usage/parse error; extension or route not
   found. HTTP status line is printed to stderr on failure without needing
@@ -130,6 +142,7 @@ Foundation hardening makes five behavioural guarantees:
   space-separated form is.
 
 ### Docs & grammar convergence
+
 - All docs pages use `godmode ext install`; `godmode extension add` appears nowhere.
   MCP invocation argument order in docs matches the binary. `agent stop` and `--debug`
   are either implemented or removed from docs — no phantom surface remains. The
@@ -140,6 +153,7 @@ Foundation hardening makes five behavioural guarantees:
   installing an extension with any of these slugs fails with a clear message.
 
 ### Permissions CLI
+
 - `godmode permissions list` prints the effective merged policy with each rule's origin
   file (global vs project).
 - `godmode permissions explain <ext> <interface> <target>` prints the decision
@@ -151,16 +165,31 @@ Foundation hardening makes five behavioural guarantees:
   permission-denied code.
 
 ### Test infrastructure
+
 - The stale test adapter grammar is updated to the current dispatch grammar; the
   help-compliance suite asserts against the real extensions directory and demonstrably
   executes (a deliberate violation fails CI); the vitest workspace covers all packages
   and the interfaces.
 
 ### GraphQL parser
+
 - Either the SDL parser handles interfaces, unions, and input types found in real
   schemas (github's included) with tests, or GraphQL SDL ingestion is explicitly marked
   experimental in `--help` and docs, with the `'{ query }'` invocation syntax
   documented. No silent mis-parsing of shipped extensions.
+
+### MCP protocol compatibility
+
+- Modern requests carry protocol version, client identity, and capabilities in `_meta`;
+  the server implements `server/discover`; every result carries the required
+  `resultType`.
+- The adapter follows the normative stdio and Streamable HTTP dual-era probes. A modern
+  error never causes fallback to legacy behavior.
+- Tools retain structured input/output and content. Resources, prompts, subscriptions,
+  caching, pagination, MRTR, and Tasks are either implemented and advertised or omitted
+  from advertised capabilities with a clear unsupported-capability error.
+- MCP conformance is gated against fixtures for both consuming and serving; tests for
+  the legacy era run separately.
 
 ## Out of scope (v1)
 
@@ -170,7 +199,8 @@ Foundation hardening makes five behavioural guarantees:
   correct; recording them is trace's job).
 - Normalized event schema extension (tool-use events) — owned by 0300/0600 prep.
 - `agent stop` implementation and zmx documentation beyond removing phantom docs — 0300.
-- Credential handling changes — 0900.
+- Credential implementation — 0900. Its security contract is defined by 0010 and it is
+  foundation work before any sandbox claim.
 
 ## Open questions
 
@@ -178,7 +208,7 @@ Foundation hardening makes five behavioural guarantees:
   honor-it, since agents in sandboxes often relocate config roots.
 - Exact exit-code numbering — needs one published table; do we reserve a contiguous
   block for future subsystems (workflow, agent) now?
-- Fail-closed granularity: should a broken *project* settings file deny only
+- Fail-closed granularity: should a broken _project_ settings file deny only
   project-scoped additions while global policy still applies, or deny everything?
 - Does `permissions explain` accept a full previously-failed command line verbatim
   (`godmode permissions explain -- stripe api /v1/charges`) as sugar?
@@ -188,7 +218,7 @@ Foundation hardening makes five behavioural guarantees:
 ## Acceptance criteria
 
 - Given a project `settings.yaml` denying `stripe`, running `godmode stripe api
-  /v1/charges` (raw path) exits with the permission-denied exit code and executes no
+/v1/charges` (raw path) exits with the permission-denied exit code and executes no
   HTTP request.
 - Given godmode serving the stripe extension over MCP from a directory whose policy
   denies a tool, when an MCP client calls that tool, the client receives an error
@@ -198,7 +228,7 @@ Foundation hardening makes five behavioural guarantees:
 - Given the same broken file, `godmode --help` and `godmode ext list` still succeed and
   print the warning.
 - Running `godmode ext install <published-npm-extension>` followed by `godmode ext
-  list` shows the extension with source `npm`, and invoking it by slug dispatches
+list` shows the extension with source `npm`, and invoking it by slug dispatches
   successfully.
 - Running `godmode ext uninstall` on that extension removes it from listings and leaves
   no package directory behind (verified by inspecting the install root).
@@ -233,3 +263,9 @@ Foundation hardening makes five behavioural guarantees:
 - Either invoking the github extension's GraphQL routes parses its real SDL correctly
   under test, or GraphQL help output labels the interface experimental and documents
   the `'{ query }'` syntax.
+- A 2026-07-28 fixture can call `server/discover` and a typed tool through godmode in
+  both directions, observing per-request metadata and required `resultType` fields.
+- A legacy fixture still works through the specified dual-era fallback, while a
+  recognized modern version error never triggers a legacy `initialize` request.
+- `godmode <ext> mcp` reports every unsupported modern primitive or extension through
+  discovery rather than advertising behavior it cannot serve.
