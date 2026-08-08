@@ -15,8 +15,8 @@ import { validateMcpFlags, executeMcpTool } from '@godmode-cli/interface-mcp';
 import { runMcp } from '@godmode-cli/interface-mcp/command';
 import type { ParsedArgs } from './args.js';
 import { readStdin } from './args.js';
-import { loadManifest, GODMODE_HOME } from './config.js';
 import { EXIT_CODES } from './exit-codes.js';
+import { getInterfaceProvider } from './interface-provider.js';
 import { showApiHelp } from './help.js';
 import {
   checkPermission,
@@ -27,12 +27,14 @@ import {
 } from './permissions.js';
 import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
 
-interface InterfaceCtx {
+export interface InterfaceCtx {
   iface: InterfaceKey;
   extensionName: string;
   manifest: Manifest;
   multi: MultiManifest;
   parsed: ParsedArgs;
+  godmodeHome: string;
+  loadManifest: (name: string, iface: InterfaceKey) => Promise<Manifest>;
   /** Original argv tail passed to the interface (used by MCP's stdio serve path). */
   rawRest: string[];
 }
@@ -180,10 +182,10 @@ export class GraphqlInterface extends Interface {
 export class McpInterface extends Interface {
   async handleEmpty(): Promise<void> {
     // Bare `godmode <ext> mcp` with no tool → serve as an MCP server.
-    const { extensionName, rawRest } = this.ctx;
+    const { extensionName, rawRest, godmodeHome, loadManifest } = this.ctx;
     await runMcp(
       {
-        godmodeHome: GODMODE_HOME,
+        godmodeHome,
         loadManifest: (n) => loadManifest(n, 'mcp'),
         checkPermission,
       },
@@ -219,11 +221,7 @@ export class McpInterface extends Interface {
 }
 
 export function getInterface(ctx: InterfaceCtx): Interface {
-  switch (ctx.iface) {
-    case 'api':     return new ApiInterface(ctx);
-    case 'graphql': return new GraphqlInterface(ctx);
-    case 'mcp':     return new McpInterface(ctx);
-    default:
-      throw new Error(`Unknown interface: ${ctx.iface}`);
-  }
+  const provider = getInterfaceProvider(ctx.iface);
+  if (!provider) throw new Error(`Unknown interface: ${ctx.iface}`);
+  return provider.create(ctx);
 }

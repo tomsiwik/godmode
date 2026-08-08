@@ -155,6 +155,26 @@ describe('ExtensionOverview', () => {
     expect(out).toContain('-v, --version');
     expect(out).not.toContain('-H, --header');
   });
+
+  it('does not describe extension-defined interfaces as REST operations', () => {
+    const desktop: MultiManifest = {
+      name: 'desktop fixture',
+      slug: 'desktop-fixture',
+      interfaces: {
+        desktop: {
+          type: 'desktop',
+          specVersion: 'test-v1',
+          versions: [],
+          resourceDescriptions: {},
+          routes: [],
+        },
+      },
+    };
+
+    expect(new ExtensionOverview(desktop).usage()).toEqual([
+      'godmode desktop-fixture desktop <command> [args]',
+    ]);
+  });
 });
 
 // ── ExtensionVersionPage ──────────────────────────────────

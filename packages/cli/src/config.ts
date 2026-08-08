@@ -4,6 +4,7 @@ import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile, readdir, unlink, access, rename, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
+import './builtin-interface-providers.js';
 import {
   compileInterface,
   projectManifest,
@@ -12,6 +13,7 @@ import {
   type ManifestSource,
   type MultiManifest,
 } from './spec.js';
+import { hasInterfaceProvider, registeredInterfaceProviders } from './interface-provider.js';
 import { BUILTINS } from './builtins.js';
 
 /** Global config directory — always `~/.godmode`. */
@@ -20,8 +22,6 @@ export const GODMODE_HOME = resolve(homedir(), '.godmode');
 /** Scope for reads and writes. `project` = the nearest `.godmode/` walking
  *  upward from cwd; `global` = `~/.godmode`. */
 export type Scope = 'project' | 'global';
-
-const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
 
 /** A slug is occupied by whichever extension registered it: built-ins ship
  *  registered, installed extensions register on install. Re-installing the
@@ -154,9 +154,9 @@ function validateSource(raw: unknown, origin: string): ManifestSource {
     throw new Error(`${origin}: 'interfaces' must be an object with at least one key`);
   }
   for (const key of Object.keys(m.interfaces)) {
-    if (!INTERFACE_KEYS.includes(key as InterfaceKey)) {
+    if (!hasInterfaceProvider(key)) {
       throw new Error(
-        `${origin}: unknown interface '${key}' (valid: ${INTERFACE_KEYS.join(', ')})`,
+        `${origin}: unknown interface '${key}' (registered: ${registeredInterfaceProviders().join(', ')})`,
       );
     }
   }
@@ -186,18 +186,18 @@ async function loadSourceFromFile(filePath: string): Promise<{ source: ManifestS
 }
 
 function absolutizeSource(source: ManifestSource, dir: string): ManifestSource {
-  const interfaces: ManifestSource['interfaces'] = {};
-  if (source.interfaces.api) interfaces.api = { ...source.interfaces.api };
-  if (source.interfaces.graphql) interfaces.graphql = { ...source.interfaces.graphql };
-  if (source.interfaces.mcp) interfaces.mcp = { ...source.interfaces.mcp };
+  const interfaces: ManifestSource['interfaces'] = Object.fromEntries(
+    Object.entries(source.interfaces).map(([name, config]) => [name, config ? { ...config } : config]),
+  );
   const next: ManifestSource = {
     ...source,
     interfaces,
   };
   for (const iface of ['api', 'graphql'] as const) {
-    const spec = next.interfaces[iface]?.spec;
+    const config = next.interfaces[iface] as { spec?: string } | undefined;
+    const spec = config?.spec;
     if (spec && !/^[a-z][a-z0-9+.-]*:/i.test(spec) && !isAbsolute(spec)) {
-      next.interfaces[iface]!.spec = resolve(dir, spec);
+      config.spec = resolve(dir, spec);
     }
   }
   return next;
@@ -262,9 +262,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
   if (resolved) {
     const { name, source } = resolved;
     assertSlugFree(source.slug || name, scope);
-    const ifaceKeys = Object.keys(source.interfaces).filter((k) =>
-      INTERFACE_KEYS.includes(k as InterfaceKey),
-    ) as InterfaceKey[];
+    const ifaceKeys = Object.keys(source.interfaces) as InterfaceKey[];
 
     if (ifaceKeys.length > 0) {
       const multi: MultiManifest = {
@@ -327,9 +325,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
   if (packageSource) {
     const slug = packageSource.slug || name;
     if (slug !== name) assertSlugFree(slug, scope, packageName);
-    const ifaceKeys = Object.keys(packageSource.interfaces).filter((k) =>
-      INTERFACE_KEYS.includes(k as InterfaceKey),
-    ) as InterfaceKey[];
+    const ifaceKeys = Object.keys(packageSource.interfaces) as InterfaceKey[];
     const multi: MultiManifest = {
       name: packageSource.name,
       slug,

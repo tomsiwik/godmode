@@ -19,6 +19,7 @@ import {
 } from '@godmode-cli/cli';
 import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
 import { BUILTINS } from './builtins.js';
+import { interfaceProviderUsage } from './interface-provider.js';
 
 // Re-exports so consumers that imported these from 'godmode/help' keep working.
 export { HelpPage, renderSections, printTable, USE_COLOR, RESET, RED, DIM, ITALIC, GREEN, visibleLength, wrapText, authMissingLabel };
@@ -217,11 +218,9 @@ export class ExtensionOverview extends HelpPage {
   title() { return titleCase(this.multi.name || this.multi.slug); }
   usage() {
     const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
-    const args = (iface: InterfaceKey) =>
-      iface === 'mcp' ? ' <tool> [args]' :
-      iface === 'graphql' ? ' <query> [flags]' :
-      ' <method> <resource> [id] [flags]';
-    return declared.map((iface) => `godmode ${this.multi.slug} ${iface}${args(iface)}`);
+    return declared.map(
+      (iface) => `godmode ${this.multi.slug} ${iface}${interfaceProviderUsage(iface)}`,
+    );
   }
   sections() {
     const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
@@ -306,11 +305,9 @@ export class InterfaceHelp extends HelpPage {
         ? (Object.keys(multi.interfaces) as InterfaceKey[])
         : [this.ifaceType];
       const ordered = [this.ifaceType, ...declared.filter((k) => k !== this.ifaceType)];
-      const args = (iface: InterfaceKey) =>
-        iface === 'mcp' ? ' <tool> [args]' :
-        iface === 'graphql' ? ' <query> [flags]' :
-        ' <method> <resource> [id] [flags]';
-      return ordered.map((iface) => `godmode ${this.apiName} ${iface}${args(iface)}`);
+      return ordered.map(
+        (iface) => `godmode ${this.apiName} ${iface}${interfaceProviderUsage(iface)}`,
+      );
     }
     const nav = this.getNav();
     if (!nav) return [];

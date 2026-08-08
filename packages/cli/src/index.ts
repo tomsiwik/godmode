@@ -3,11 +3,13 @@ import {
   loadManifest,
   loadMultiManifest,
   findInstalledManifestSync,
+  GODMODE_HOME,
 } from './config.js';
 import type { InterfaceKey } from './spec.js';
 import { parseArgs } from './args.js';
 import { showHelp, showExtensionOverview, showExtensionVersion, showVersion } from './help.js';
 import { getInterface } from './interfaces.js';
+import { hasInterfaceProvider } from './interface-provider.js';
 import { EXIT_CODES } from './exit-codes.js';
 import { warnSettingsErrors } from './settings.js';
 import { BUILTINS } from './builtins.js';
@@ -23,8 +25,6 @@ loadEnv();
 // the user picks one explicitly each time. Nested help drills at every
 // level: `godmode stripe --help` → extension overview,
 // `godmode stripe api --help` → interface help, etc.
-
-const VALID_INTERFACES = new Set<InterfaceKey>(['api', 'graphql', 'mcp', 'skill']);
 
 async function main() {
   const args = process.argv.slice(2);
@@ -75,7 +75,7 @@ async function main() {
   }
 
   // Interface is mandatory. First token MUST be a declared interface.
-  if (!VALID_INTERFACES.has(first as InterfaceKey)) {
+  if (!hasInterfaceProvider(first)) {
     process.stderr.write(`Missing interface.\n`);
     process.stderr.write(`'${extensionSlug}' declares: ${declared.join(', ')}.\n`);
     process.stderr.write(`Try 'godmode ${extensionSlug} ${declared[0]} ${first}' or 'godmode ${extensionSlug} --help'.\n`);
@@ -113,7 +113,14 @@ async function runInterface(iface: string, extensionName: string, rest: string[]
   const manifest = await loadManifest(extensionName, ifaceKey);
 
   const handler = getInterface({
-    iface: ifaceKey, extensionName, manifest, multi, parsed, rawRest: rest,
+    iface: ifaceKey,
+    extensionName,
+    manifest,
+    multi,
+    parsed,
+    rawRest: rest,
+    godmodeHome: GODMODE_HOME,
+    loadManifest,
   });
 
   if (parsed.help) {
