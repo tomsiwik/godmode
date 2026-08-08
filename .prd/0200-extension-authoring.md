@@ -79,8 +79,8 @@ The authoring surface is a lifecycle: **create → validate → test → publish
   needed, per-interface examples, and top routes — regenerated on update so it never
   drifts from the manifest.
 - **Agent authorship**: creations made by a non-interactive/agent caller install to
-  project scope and are recorded as unapproved; dispatch by agent contexts is denied
-  until `godmode extension approve <slug>` is run by a human in a TTY.
+  project scope and are recorded as unapproved; dispatch by agent principals is denied
+  until `godmode extension approve <slug>` is run by an authenticated human principal.
 
 ## Behaviour details
 
@@ -116,16 +116,17 @@ godmode extension approve <slug>        # human ack for agent-created extensions
   installable from the curated index — see 0800) each print one actionable line.
 - Approval state is visible: `godmode ext list` marks unapproved extensions; invoking
   one from an agent context exits with the permission-denied code and a message naming
-  `godmode extension approve <slug>` as the remedy. Human TTY invocation of an
-  unapproved project extension warns but proceeds.
+  `godmode extension approve <slug>` as the remedy. Invocation by an authenticated human
+  principal may present an interactive warning and proceed according to policy.
 - Every successful `create` and `update` (re)writes `SKILL.md` beside the manifest;
   installed extensions expose it via `godmode ext skill <slug>` (prints to stdout).
 
 ### State transitions
 
 `scaffolded → validated → installed (approved | unapproved) → published`.
-Unapproved → approved only via a human-in-TTY `approve`. Uninstall clears approval
-state; reinstall by an agent returns to unapproved.
+Unapproved → approved only through an approval record from an authenticated human
+principal as defined by 0010. Uninstall clears approval state; reinstall by an agent
+returns to unapproved.
 
 ## Out of scope (v1)
 
@@ -154,7 +155,7 @@ state; reinstall by an agent returns to unapproved.
 ## Acceptance criteria
 
 - Running `godmode extension create my-ext --archetype api --slug my-ext --spec
-  https://example.com/openapi.json --auth bearer --auth-env MY_TOKEN --yes` with no TTY
+https://example.com/openapi.json --auth bearer --auth-env MY_TOKEN --yes` with no TTY
   produces a directory whose manifest `godmode ext install ./my-ext` accepts unmodified.
 - The same command minus `--spec`, with no TTY, exits non-zero naming `--spec` as the
   missing required flag and prompts for nothing.
@@ -178,11 +179,12 @@ state; reinstall by an agent returns to unapproved.
 - Every scaffolded and installed extension has a `SKILL.md` containing the invocation
   grammar, required auth env vars, and at least one runnable example per interface;
   `godmode ext skill <slug>` prints it.
-- After an agent (non-TTY) creates and installs an extension in a project, `godmode ext
-  list` marks it unapproved, and dispatching it from an agent context exits with the
+- After an agent principal creates and installs an extension in a project, `godmode ext
+list` marks it unapproved, and dispatching it from an agent context exits with the
   permission-denied code and names `godmode extension approve <slug>`.
-- `godmode extension approve <slug>` run by a human in a TTY flips the state; the same
-  dispatch then succeeds; running `approve` without a TTY fails.
+- `godmode extension approve <slug>` run by an authenticated human principal creates an
+  approval bound to the extension digest; the same dispatch then succeeds. A pseudo-TTY
+  without a human principal cannot approve it.
 - Uninstalling and agent-reinstalling a previously approved extension returns it to
   unapproved.
 - An orchestrator route wrapping a call denied by policy fails with the permission-denied

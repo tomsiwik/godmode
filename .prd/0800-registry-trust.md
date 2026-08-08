@@ -103,7 +103,7 @@ godmode ext list [--source curated|npm|local]
   covers install decisions too.
 - Typosquat block: installing a slug within edit distance 1–2 of a curated slug prints
   `refusing: '<slug>' closely resembles curated extension '<curated>'` and requires an
-  explicit human confirmation flag in a TTY; agents cannot override.
+  approval from an authenticated human principal; agent principals cannot override.
 - Update diff: `godmode ext update slack` prints sections `added (N)`, `removed (N)`,
   `changed (N)`; write-capable additions (non-GET routes, new MCP tools) are flagged.
   Interactive: confirm to proceed. Non-interactive: requires `--yes-diff`, else exits
@@ -141,9 +141,9 @@ rewritten). Digest mismatch or policy denial leaves prior installed state untouc
 - Should global (non-project) installs also pin, or is pinning project-only in v1?
 - Edit-distance thresholds: distance 2 catches more squats but will false-positive on
   legitimately similar slugs — is a curated "known distinct pairs" allowlist enough?
-- What principal marker distinguishes "agent caller" from "human caller" for install
-  policy — TTY detection alone is spoofable by wrapping in a pty; is that acceptable
-  for v1?
+- Which trusted host integrations issue the human/agent principals defined by 0010, and
+  what restricted fallback applies when a host cannot? TTY detection is not acceptable
+  as an authorization boundary.
 - Does `search` cover MCP-server directories beyond the godmode curated set, or stay
   godmode-extensions-only?
 
@@ -157,8 +157,8 @@ rewritten). Digest mismatch or policy denial leaves prior installed state untouc
 - Running `godmode ext install stripe` prints a provenance block naming the spec
   host(s), declared auth env vars, exposed interfaces, and `curated` status before any
   spec is compiled.
-- Installing a non-curated npm extension in a TTY asks for confirmation after the
-  provenance block; declining leaves nothing installed.
+- Installing a non-curated npm extension as an authenticated human principal asks for
+  confirmation after the provenance block; declining leaves nothing installed.
 - After a project install, the project lockfile contains the extension's resolved
   source, version, spec URL, and spec digest.
 - On a machine with the lockfile, `godmode ext install --locked` reproduces a compiled
@@ -166,8 +166,9 @@ rewritten). Digest mismatch or policy denial leaves prior installed state untouc
 - If the upstream spec changed, `install --locked` exits non-zero naming the extension
   and both digests, and installs nothing.
 - With policy `agents: install curated-only`, an agent-context `godmode ext install
-  random-npm-pkg` exits with the permission-denied code and a reason naming the policy
-  statement; the same command run by a human in a TTY may proceed after confirmation.
+random-npm-pkg` exits with the permission-denied code and a reason naming the policy
+  statement; the same command run by an authenticated human principal may proceed after
+  confirmation.
 - `godmode permissions explain` for a blocked install prints the winning install-policy
   statement and its origin file.
 - Attempting `godmode ext install strlpe` (edit distance 1 from curated `stripe`) is

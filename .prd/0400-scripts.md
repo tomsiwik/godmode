@@ -6,8 +6,8 @@
 
 Scripts are fixed, named code blocks with declared inputs and outputs, authored by
 humans or by agents, stored project-scoped in `.godmode/scripts/` and shipped with the
-repository. Where an extension wraps a *remote capability* (API, GraphQL, MCP), a
-script wraps a *local step body*: deterministic-ish shell/code the team has reviewed
+repository. Where an extension wraps a _remote capability_ (API, GraphQL, MCP), a
+script wraps a _local step body_: deterministic-ish shell/code the team has reviewed
 once and everyone — human or agent — can then invoke by name instead of re-deriving it
 each session. `godmode script run` validates inputs against the declaration before a
 single line executes, emits JSON output by convention, and passes through the same
@@ -53,7 +53,7 @@ project's.
 
 Invocation is `godmode script run <name>` with inputs supplied as `--input key=value`
 pairs or a single JSON object on stdin/flag. Inputs are validated against the
-declaration *before execution*: missing required inputs, unknown keys, and type
+declaration _before execution_: missing required inputs, unknown keys, and type
 mismatches abort with a descriptive error and nothing runs. On success, the script's
 declared outputs are emitted as a JSON object on stdout (the body writes JSON, or
 declares a single raw output that godmode wraps) — this JSON-in/JSON-out convention is
@@ -73,8 +73,8 @@ humans who explicitly acknowledge, but denied to agent callers until a human app
 (`script approve <name>`), flipping the marker in the committed file so approval itself
 is diffable.
 
-**Relationship framing:** a *script* is a step body; an *extension* is a remote
-capability; a *workflow* (0500) is the composition. A script that outgrows one repo is
+**Relationship framing:** a _script_ is a step body; an _extension_ is a remote
+capability; a _workflow_ (0500) is the composition. A script that outgrows one repo is
 promotable: `script promote <name>` scaffolds a command-backed extension (0200 pipeline)
 from its manifest, carrying over the declared I/O.
 
@@ -94,7 +94,7 @@ godmode script create [<name>] [--description ...] [--input name:type[:required]
 godmode script run <name> [--input k=v]... [--json-input '{...}'] [--json]
 godmode script list [--json] [--pending]           # pending = unapproved agent-authored
 godmode script show <name> [--json]                # manifest incl. I/O schema + provenance
-godmode script approve <name>                      # human ack; refuses inside agent context
+godmode script approve <name>                      # authenticated human approval
 godmode script promote <name>                      # scaffold extension from script (→ 0200)
 ```
 
@@ -105,7 +105,7 @@ name: seed-db
 description: Reset and seed the local database for one environment.
 provenance: { author: agent, approved: false }
 inputs:
-  env:   { type: string, required: true, enum: [local, staging] }
+  env: { type: string, required: true, enum: [local, staging] }
   count: { type: integer, default: 50 }
 outputs:
   seeded: { type: integer }
@@ -142,7 +142,8 @@ body: |
 
 1. Input transport into the body: environment variables (as sketched), argv, stdin JSON, or all three? Pick one primary convention before 0500 depends on it.
 2. Does human `run` of an unapproved script require an explicit `--yes-unapproved` flag, or is interactive confirmation enough? Non-interactive human contexts (CI) need an answer.
-3. How does godmode distinguish an agent caller from a human for the approval gate — invocation context marker, environment, or permission principal? (Shared with 0500's gate behaviour.)
+3. Which trusted host integrations can issue the authenticated principals required by
+   0010, and what restricted fallback applies when a host cannot?
 4. Should `--from last N` read shell history, or only commands executed through a recording wrapper? Shell-history parsing is fragile and shell-specific.
 5. Reserved name policy: `script` joins the reserved built-in namespace (cross-cutting decision 3) — confirm alongside `workflow`, `history`, `trace`, `auth`.
 6. Is the output declaration required, or may a script declare `outputs: none` and still be workflow-composable as a fire-and-forget step?

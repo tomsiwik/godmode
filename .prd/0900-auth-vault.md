@@ -1,11 +1,11 @@
 # 0900 — Auth vault & credential brokering
 
-**Status:** Draft · **Level:** Epic · **Depends on:** — (independent; unblocks the full sandbox story any time)
+**Status:** Draft · **Level:** Epic · **Depends on:** 0010, 0100
 
 ## Summary
 
-godmode's sandbox pitch is that an agent needs only `Bash(godmode:*)` and godmode's
-permission layer scopes everything inside it — but today every credential is a raw
+godmode's governed-runtime pitch requires an agent to use capabilities without receiving
+their credentials — but today every credential is a raw
 environment variable that any process, including the agent itself, can read directly.
 This epic replaces env-var plumbing with an OS-keychain-backed vault: `godmode auth
 login <extension>` stores a credential once, godmode injects it only at call time
@@ -13,8 +13,8 @@ inside its own process, and the secret never appears in the calling agent's
 environment, in errors, in debug output, or in trace/history records. Multiple
 profiles per extension (e.g. stripe test vs live) with project-scoped defaults, a
 graceful migration story alongside existing env vars, and actionable
-missing-credential errors complete the picture. The result: an agent can *use*
-stripe through godmode without ever being *able to read* the stripe key.
+missing-credential errors complete the picture. The result: an agent can _use_
+stripe through godmode without ever being _able to read_ the stripe key.
 
 ## Problem / Motivation
 
@@ -23,7 +23,7 @@ time the interface reads `process.env[authConfig.env]`
 (`interfaces/api/src/request.ts:34`) and the missing-key error even instructs users
 to "Set it in .env or export it in your shell." That means the credential lives in
 the environment of the shell that launches the agent — so a sandboxed agent granted
-only `Bash(godmode:*)` can call stripe through godmode *and* run
+only `Bash(godmode:*)` can call stripe through godmode _and_ run
 `echo $STRIPE_API_KEY`. Permission rules scoping stripe to read-only are theater if
 the raw key is one env lookup away: the agent can curl the API directly with full
 privileges, and any prompt-injected instruction can exfiltrate the key verbatim.
@@ -37,7 +37,9 @@ trace/history stores (0600/0700).
 - As a developer, I want to log in to an extension once (`godmode auth login stripe`) and have every project on my machine use it, so that keys stop living in `.env` files.
 - As a developer, I want godmode to use my stored credential without it ever entering my agent's environment, so that granting `Bash(godmode:*)` doesn't hand over the key itself.
 - As a developer, I want OAuth device-code login for providers that support it, so that I never handle a raw token for those services at all.
-- As a developer, I want separate `test` and `live` profiles for stripe with a per-project default, so that an agent working in a sandbox project physically cannot hit live billing.
+- As a developer, I want separate `test` and `live` profiles for Stripe with a
+  per-project default, so that godmode refuses to attach live credentials for an agent
+  that is authorized only for the test profile.
 - As a privacy-conscious user, I want credentials in the OS keychain rather than plaintext files, so that they inherit the OS's locking and access-control behaviour.
 - As a developer migrating, I want my existing env vars to keep working with a clear precedence order, so that adopting the vault is incremental and nothing breaks on day one.
 - As an agent, when a credential is missing I want the error to tell me it's a human-only step (`run: godmode auth login stripe`), so that I can report the exact remediation instead of flailing.
@@ -70,7 +72,7 @@ Two login shapes:
 **Profiles**: each extension can hold multiple named credentials (`default` implied).
 `godmode auth login stripe --profile live` adds one. A project's `.godmode/` settings
 can select that project's default profile; `--profile` on any invocation overrides
-per call. Profile *names* are visible everywhere; profile *values* nowhere.
+per call. Profile _names_ are visible everywhere; profile _values_ nowhere.
 
 **Precedence during migration** (explicit, documented, shown by `auth status`):
 
@@ -145,10 +147,9 @@ required. `--dry-run` still works without credentials and marks the auth header 
 
 ### Permission interaction
 
-- `auth login|logout` are interactive, human-only operations: when invoked from
-  within an orchestrated agent run (0300), they are refused (default-deny posture,
-  consistent with 0600/0700) — agents can trigger the *need* for auth, never the
-  *provisioning* of it.
+- `auth login|logout` require an authenticated human principal. TTY presence controls
+  prompt presentation but does not establish the principal. Agent principals can
+  trigger the _need_ for auth, never the _provisioning_ of it.
 - `auth list`/`auth status` from an agent follow the standard permission model
   (default-deny, allowable by rule) since even metadata ("live profile exists") is
   reconnaissance-adjacent.
@@ -171,7 +172,7 @@ required. `--dry-run` still works without credentials and marks the auth header 
 
 - Fallback for Linux setups without a Secret Service implementation: refuse vault
   features, or ship an encrypted-file backend behind an explicit opt-in?
-- Should extensions be able to declare multiple named credential *fields* (key +
+- Should extensions be able to declare multiple named credential _fields_ (key +
   secret pairs, e.g. AWS-style), and how does that surface in `auth login` prompts?
 - Is the env-var deprecation notice per-invocation too noisy for CI? (Likely: notice
   once per day per extension, or suppress when not a TTY.)
@@ -188,9 +189,10 @@ required. `--dry-run` still works without credentials and marks the auth header 
   the OS keychain, prints a confirmation naming extension and profile, and never
   echoes any part of the secret; the secret appears in no file under `~/.godmode/`
   or the project.
-- Piping a secret via stdin to `godmode auth login stripe` in a non-TTY context
-  stores it without prompting; passing a secret as a command-line argument is not
-  supported and login says so.
+- Piping a secret via stdin to `godmode auth login stripe` under an authenticated human
+  or explicitly authorized provisioning principal stores it without prompting. An
+  unauthenticated or agent principal is refused, and passing a secret as a command-line
+  argument is not supported.
 - With a vault credential stored and the manifest's env var unset, a stripe call
   succeeds; the spawned request carries auth while `env | grep STRIPE` in the
   calling shell shows nothing godmode added.

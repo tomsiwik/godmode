@@ -30,7 +30,7 @@ durability and approval gates.
 
 ## User stories
 
-- As a developer, I define a release train — build, test, changeset, *human gate*, publish — in one YAML file, run it, and approve the gate from my terminal when ready.
+- As a developer, I define a release train — build, test, changeset, _human gate_, publish — in one YAML file, run it, and approve the gate from my terminal when ready.
 - As a team lead, I review the release workflow in a PR like any code, and know each step is still subject to the same permission rules as ad-hoc invocations.
 - As an agent, I kick off a long task as a workflow so that if my context is compacted, the durable step state — not my memory — knows what is done and what is next.
 - As an agent caller, I run a gated workflow with `--wait` so my invocation blocks until the human approves, instead of my having to poll.
@@ -70,11 +70,11 @@ prior step's success/failure — nothing richer). Every cut feature is a state-m
 complication; v1 optimizes for a run status a human can read top-to-bottom and trust.
 Parallelism and composition are explicitly deferred, not rejected.
 
-Permissions come free: each step is a normal dispatch, so the caller's effective
+Permissions remain centralized: each step is a normal runtime dispatch, so the caller's effective
 policy applies per step. A workflow file grants nothing by itself — an agent allowed
 to start a workflow but denied `script:deploy-*` will see the run fail with a
 permission error at exactly that step. Gates additionally support `approvers: human`
-to refuse approval from agent contexts (default-deny consistency, decision 6).
+to require an authenticated human principal (default-deny consistency, decision 7).
 
 ## Behaviour details
 
@@ -148,8 +148,9 @@ steps:
 
 ## Open questions
 
-1. Approval identity: does gate approval record *who* approved (OS user? configured identity?), and is that a v1 requirement for the release-train use case?
-2. Agent-vs-human context detection for `approvers: human` — same mechanism as 0400's script approval; must be decided once, jointly.
+1. Approval identity: does gate approval record _who_ approved (OS user? configured identity?), and is that a v1 requirement for the release-train use case?
+2. Which trusted principal issuers support `approvers: human`, and what happens on a
+   host that cannot authenticate a human principal? TTY detection is forbidden by 0010.
 3. Should agent steps default to capturing full normalized event streams (0300) into the run record, or only the final output, with events opt-in for cost reasons?
 4. `--wait` timeout default: unbounded (Temporal-like) or bounded with explicit opt-out? Agents blocking forever on a forgotten gate is a real failure mode.
 5. Does a `stopped` run permit resume, or is stop terminal? (Leaning terminal; rejection ≠ pause.)

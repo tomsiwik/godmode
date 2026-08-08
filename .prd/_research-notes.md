@@ -4,11 +4,12 @@
 
 ## Vision
 
-godmode is the Swiss Army knife CLI for coding agents: one invocation grammar
+godmode is the local capability runtime for coding agents: one invocation grammar
 (`godmode [extension] [interface] [args]`) wraps APIs, GraphQL, MCP servers, and local
-commands as installable extensions. A sandboxed agent needs a single permission —
-`Bash(godmode:*)` — to reach its whole toolbelt, and godmode's own permission layer scopes
-what is reachable inside that. Target end-state: **one CLI harness does it all** — tools,
+commands as installable extensions. Where the host enforces the command boundary, an
+agent can use one permission — `Bash(godmode:*)` — to reach its whole toolbelt, and
+godmode's own permission layer scopes what is reachable inside that. Target end-state:
+**one CLI harness does it all** — tools,
 agent orchestration, scripts, workflows, and a unified searchable history of all
 agent dialogue, serving both daily engineering and harness research.
 
@@ -56,6 +57,7 @@ agent dialogue, serving both daily engineering and harness research.
 ## Defects & gaps found (feeds Epic 01)
 
 **Blockers**
+
 - Raw-path escape hatch (`godmode stripe api /v1/...`) executes before `checkPermission`
   → any deny rule bypassable (`packages/cli/src/interfaces.ts:71-81`).
 - MCP serve mode (`interfaces/mcp/src/server.ts`) enforces no permissions — the
@@ -67,6 +69,7 @@ agent dialogue, serving both daily engineering and harness research.
 - Corrupt/unparseable `settings.yaml` fails **open** to allow-all (`settings.ts:61-71`).
 
 **Major**
+
 - `godmode ext create` wizard emits the legacy flat manifest format that the installer
   rejects, writes `<name>.yaml` not `manifest.yaml`, hints a dead command
   (`godmode extension add`).
@@ -92,14 +95,33 @@ agent dialogue, serving both daily engineering and harness research.
   captured) — blocks history/research value.
 - No permissions CLI UX (list effective policy, grant/deny flow, "blocked — add rule?").
 
+## Position relative to MCP 2026-07-28
+
+- MCP is now stateless per request and requires `server/discover`; it no longer uses
+  protocol-level sessions for modern requests.
+- Multi Round-Trip Requests replace unsolicited server-to-client requests for
+  elicitation. The official Tasks extension covers durable asynchronous work,
+  mid-flight input, progress, polling, reconnection, and cancellation.
+- Optional extensions are negotiated through per-request capabilities. MCP Apps and
+  Tasks are official; Skills over MCP is active work. The MCP Registry and Inspector
+  CLI cover distribution and scriptable MCP invocation respectively.
+- Therefore godmode does not compete by inventing another model-to-tool transport. It
+  competes as the local execution, packaging, policy, credential, composition, and audit
+  layer across MCP and non-MCP capabilities. See `0010-capability-runtime-spec.md`.
+- The current MCP adapter is legacy-only (`2025-03-26`, `initialize`,
+  `Mcp-Session-Id`) and tool-only. Modern dual-era compatibility and lossless primitive
+  preservation are foundation requirements, not follow-up polish.
+
 ## Prior art worth learning from
 
 - opencode: SQLite session store (first ingest target + schema reference), client/server
   split (HTTP daemon per agent = clean RPC substrate).
 - Claude Code: subagents (sync parent-owned model), hooks/skills, `--resume` picker UX,
   plugin/skill scaffolds.
-- MCP sampling (callee asks caller's model — inverse direction to support when godmode
-  serves MCP). A2A-style agent cards for discovery.
+- MCP 2026-07-28 per-request discovery, MRTR, Tasks, deterministic caching, extension
+  negotiation, and OpenTelemetry propagation. Roots, Sampling, and protocol Logging are
+  deprecated for new implementations. A2A-style agent cards remain useful prior art for
+  agent discovery.
 - Temporal/LangGraph: durable execution, signals ≙ human gates, checkpointers. GitHub
   Actions YAML ergonomics. `just`/`mise` as the degenerate no-state task runner.
 - OpenTelemetry GenAI semantic conventions (naming for trace events).
@@ -125,14 +147,14 @@ agent dialogue, serving both daily engineering and harness research.
 
 ## Epic map
 
-| # | File | Epic |
-|---|------|------|
-| 01 | 0100-foundation-hardening.md | Foundation hardening & consistency (fixes) |
-| 02 | 0200-extension-authoring.md | Extension authoring & scaffolding (`godmode extension create`) |
-| 03 | 0300-agent-orchestration.md | Agent orchestration & messaging (`godmode agent *`) |
-| 04 | 0400-scripts.md | Scripts (`godmode script create|run`) |
-| 05 | 0500-workflows.md | Workflows (`godmode workflow *`) |
-| 06 | 0600-sessions-history.md | Sessions & history (`godmode history|sessions *`) |
-| 07 | 0700-observability-trace.md | Observability & audit (`godmode trace`) |
-| 08 | 0800-registry-trust.md | Extension registry & trust |
-| 09 | 0900-auth-vault.md | Auth vault & credential brokering |
+| #   | File                         | Epic                                                           |
+| --- | ---------------------------- | -------------------------------------------------------------- | ------------- |
+| 01  | 0100-foundation-hardening.md | Foundation hardening & consistency (fixes)                     |
+| 02  | 0200-extension-authoring.md  | Extension authoring & scaffolding (`godmode extension create`) |
+| 03  | 0300-agent-orchestration.md  | Agent orchestration & messaging (`godmode agent *`)            |
+| 04  | 0400-scripts.md              | Scripts (`godmode script create                                | run`)         |
+| 05  | 0500-workflows.md            | Workflows (`godmode workflow *`)                               |
+| 06  | 0600-sessions-history.md     | Sessions & history (`godmode history                           | sessions \*`) |
+| 07  | 0700-observability-trace.md  | Observability & audit (`godmode trace`)                        |
+| 08  | 0800-registry-trust.md       | Extension registry & trust                                     |
+| 09  | 0900-auth-vault.md           | Auth vault & credential brokering                              |
