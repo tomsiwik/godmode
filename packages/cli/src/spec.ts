@@ -1,8 +1,3 @@
-import { parseOpenApi } from '@godmode-cli/interface-api';
-import { parseGraphQL } from '@godmode-cli/interface-graphql';
-import { parseMcp } from '@godmode-cli/interface-mcp';
-import { getInterfaceProvider } from './interface-provider.js';
-
 // ── auth & shared ─────────────────────────────────────────────
 
 export interface AuthConfig {
@@ -78,7 +73,7 @@ export interface Route {
   segments: Segment[];
 }
 
-// ── compiled interface data (written to ~/.godmode/apis/<name>.json) ──
+// ── compiled interface data (written to .godmode/extensions/<name>.json) ──
 
 /**
  * Per-interface compiled data. Routes/tools produced by the parser,
@@ -214,81 +209,4 @@ export function projectManifest(multi: MultiManifest, iface: InterfaceKey): Mani
     resourceDescriptions: data.resourceDescriptions,
     routes: data.routes,
   };
-}
-
-// ── strategy dispatcher ───────────────────────────────────────
-
-type AnyParser = (name: string, config: ApiConfig) => Promise<Manifest>;
-interface CompiledInterfaceBase {
-  specVersion: string;
-  versions: VersionConfig[];
-  resourceDescriptions: Record<string, string>;
-  routes: Route[];
-}
-async function compileLegacy(
-  iface: string,
-  name: string,
-  source: ManifestSource,
-  parser: AnyParser,
-): Promise<{ flat: Manifest; ifaceSource: InterfaceSource; base: CompiledInterfaceBase }> {
-  const ifaceSource = source.interfaces[iface];
-  if (!ifaceSource) throw new Error(`Interface '${iface}' not declared on '${name}'`);
-  const values = ifaceSource as Record<string, unknown>;
-
-  const legacyConfig: ApiConfig = {
-    slug: source.slug || name,
-    name: source.name,
-    description: source.description,
-    type: iface,
-    auth: source.auth,
-    headers: source.headers,
-    ...(typeof values.spec === 'string' ? { spec: values.spec } : {}),
-    ...(typeof values.url === 'string' ? { url: values.url } : {}),
-    ...(typeof values.prefix === 'string' ? { prefix: values.prefix } : {}),
-    ...(Array.isArray(values.versions) ? { versions: values.versions as VersionConfig[] } : {}),
-  };
-
-  const flat = await parser(name, legacyConfig);
-  return {
-    flat,
-    ifaceSource,
-    base: {
-      specVersion: flat.specVersion,
-      versions: flat.versions,
-      resourceDescriptions: flat.resourceDescriptions,
-      routes: flat.routes,
-    },
-  };
-}
-
-export async function compileApiInterface(name: string, source: ManifestSource): Promise<InterfaceData> {
-  const { flat, ifaceSource, base } = await compileLegacy('api', name, source, parseOpenApi);
-  const api = ifaceSource as ApiInterfaceSource;
-  return { ...base, type: 'api', spec: api.spec, url: flat.config.url, prefix: api.prefix };
-}
-
-export async function compileGraphqlInterface(name: string, source: ManifestSource): Promise<InterfaceData> {
-  const { flat, ifaceSource, base } = await compileLegacy('graphql', name, source, parseGraphQL);
-  const graphql = ifaceSource as GraphqlInterfaceSource;
-  return { ...base, type: 'graphql', spec: graphql.spec, url: flat.config.url };
-}
-
-export async function compileMcpInterface(name: string, source: ManifestSource): Promise<InterfaceData> {
-  const { flat, ifaceSource, base } = await compileLegacy('mcp', name, source, parseMcp);
-  const mcp = ifaceSource as McpInterfaceSource;
-  return { ...base, type: 'mcp', url: mcp.url, _mcpTools: flat.config._mcpTools };
-}
-
-/**
- * Run the parser for one interface and return its compiled data.
- * Each parser returns a legacy flat Manifest; we convert to InterfaceData.
- */
-export async function compileInterface(
-  iface: InterfaceKey,
-  name: string,
-  source: ManifestSource,
-): Promise<InterfaceData> {
-  const provider = getInterfaceProvider(iface);
-  if (!provider) throw new Error(`Unknown interface '${iface}'`);
-  return provider.compile(name, source);
 }

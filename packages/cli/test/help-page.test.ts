@@ -157,12 +157,12 @@ describe('ExtensionOverview', () => {
   });
 
   it('does not describe extension-defined interfaces as REST operations', () => {
-    const desktop: MultiManifest = {
-      name: 'desktop fixture',
-      slug: 'desktop-fixture',
+    const app: MultiManifest = {
+      name: 'app fixture',
+      slug: 'app-fixture',
       interfaces: {
-        desktop: {
-          type: 'desktop',
+        app: {
+          type: 'app',
           specVersion: 'test-v1',
           versions: [],
           resourceDescriptions: {},
@@ -171,8 +171,8 @@ describe('ExtensionOverview', () => {
       },
     };
 
-    expect(new ExtensionOverview(desktop).usage()).toEqual([
-      'godmode desktop-fixture desktop <command> [args]',
+    expect(new ExtensionOverview(app).usage()).toEqual([
+      'godmode app-fixture app <command> [args]',
     ]);
   });
 });

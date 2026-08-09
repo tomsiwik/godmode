@@ -1,69 +1,83 @@
 import { describe, expect, it } from 'vitest';
-import '../src/builtin-interface-providers.js';
-import { InterfaceRegistry } from '../src/interface-registry.js';
-import {
-  interfaceProviderUsage,
-  registerInterfaceProvider,
-  registeredInterfaceProviders,
-} from '../src/interface-provider.js';
-import { compileInterface, type ManifestSource } from '../src/spec.js';
-import { getInterface, Interface, type InterfaceCtx } from '../src/interfaces.js';
+import '../src/builtin-interfaces.js';
+import { InterfaceRegistry, interfaceRegistry } from '../src/interface-registry.js';
+import type { InterfaceData, ManifestSource } from '../src/spec.js';
+import { Interface, type InterfaceContext } from '../src/interfaces.js';
 
-describe('interface provider registry', () => {
+describe('interface class registry', () => {
   it('accepts extension-defined lowercase interface names', () => {
-    const registry = new InterfaceRegistry<{ id: string }>();
+    const registry = new InterfaceRegistry();
+    class AppInterface extends Interface {
+      static readonly key = 'app';
+      static readonly usage = ' <action> <application>';
+      static async compile(): Promise<InterfaceData> {
+        return {
+          type: 'app', specVersion: 'test', versions: [], resourceDescriptions: {}, routes: [],
+        };
+      }
+      async execute(): Promise<void> {}
+    }
 
-    registry.register('desktop', { id: 'desktop-provider' });
+    registry.register(AppInterface);
 
-    expect(registry.has('desktop')).toBe(true);
-    expect(registry.get('desktop')).toEqual({ id: 'desktop-provider' });
-    expect(registry.names()).toEqual(['desktop']);
+    expect(registry.has('app')).toBe(true);
+    expect(registry.get('app')).toBe(AppInterface);
+    expect(registry.names()).toEqual(['app']);
   });
 
-  it('rejects invalid names and prevents providers from overriding an owner', () => {
-    const registry = new InterfaceRegistry<{ id: string }>();
-    registry.register('api', { id: 'first' });
+  it('rejects invalid names and prevents classes from overriding an owner', () => {
+    const registry = new InterfaceRegistry();
+    class ApiInterface extends Interface {
+      static readonly key = 'api';
+      static readonly usage = '';
+      static async compile(): Promise<InterfaceData> {
+        return {
+          type: 'api', specVersion: 'test', versions: [], resourceDescriptions: {}, routes: [],
+        };
+      }
+      async execute(): Promise<void> {}
+    }
+    class OtherApiInterface extends ApiInterface {}
+    class UppercaseInterface extends ApiInterface { static readonly key = 'API'; }
+    registry.register(ApiInterface);
 
-    expect(() => registry.register('api', { id: 'second' })).toThrow(
+    expect(() => registry.register(OtherApiInterface)).toThrow(
       "Interface 'api' is already registered",
     );
-    expect(() => registry.register('API', { id: 'uppercase' })).toThrow(
+    expect(() => registry.register(UppercaseInterface)).toThrow(
       "Invalid interface name 'API'",
     );
   });
 
   it('registers built-in compilers and handlers through the same named seam', () => {
-    expect(registeredInterfaceProviders()).toEqual(['api', 'graphql', 'mcp']);
+    expect(interfaceRegistry.names()).toEqual(['api', 'graphql', 'mcp']);
   });
 
-  it('uses one extension-defined provider for compilation and runtime dispatch', async () => {
-    class DesktopInterface extends Interface {
+  it('uses one extension-defined class for compilation and runtime dispatch', async () => {
+    class AppInterface extends Interface {
+      static readonly key = 'app';
+      static readonly usage = ' <action> <application>';
+      static async compile(): Promise<InterfaceData> {
+        return {
+          type: 'app', specVersion: 'test', versions: [], resourceDescriptions: {}, routes: [],
+        };
+      }
       async execute(): Promise<void> {}
     }
-
-    registerInterfaceProvider('desktop', {
-      usage: ' <application> [flags]',
-      compile: async () => ({
-        type: 'desktop',
-        specVersion: 'test',
-        versions: [],
-        resourceDescriptions: {},
-        routes: [],
-      }),
-      create: (ctx) => new DesktopInterface(ctx),
-    });
+    const registry = new InterfaceRegistry();
+    registry.register(AppInterface);
 
     const source: ManifestSource = {
-      name: 'Desktop fixture',
-      interfaces: { desktop: { application: 'Finder' } },
+      name: 'App fixture',
+      interfaces: { app: { application: 'Finder' } },
     };
-    expect(await compileInterface('desktop', 'desktop-fixture', source)).toMatchObject({
-      type: 'desktop',
+    expect(await registry.get('app')!.compile('app-fixture', source)).toMatchObject({
+      type: 'app',
       specVersion: 'test',
     });
 
-    const handler = getInterface({ iface: 'desktop' } as InterfaceCtx);
-    expect(handler).toBeInstanceOf(DesktopInterface);
-    expect(interfaceProviderUsage('desktop')).toBe(' <application> [flags]');
+    const handler = registry.create({ iface: 'app' } as InterfaceContext);
+    expect(handler).toBeInstanceOf(AppInterface);
+    expect(registry.usage('app')).toBe(' <action> <application>');
   });
 });

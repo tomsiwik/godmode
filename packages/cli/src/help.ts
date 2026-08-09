@@ -19,7 +19,7 @@ import {
 } from '@godmode-cli/cli';
 import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
 import { BUILTINS } from './builtins.js';
-import { interfaceProviderUsage } from './interface-provider.js';
+import { interfaceRegistry } from './interface-registry.js';
 
 // Re-exports so consumers that imported these from 'godmode/help' keep working.
 export { HelpPage, renderSections, printTable, USE_COLOR, RESET, RED, DIM, ITALIC, GREEN, visibleLength, wrapText, authMissingLabel };
@@ -219,7 +219,7 @@ export class ExtensionOverview extends HelpPage {
   usage() {
     const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
     return declared.map(
-      (iface) => `godmode ${this.multi.slug} ${iface}${interfaceProviderUsage(iface)}`,
+      (iface) => `godmode ${this.multi.slug} ${iface}${interfaceRegistry.usage(iface)}`,
     );
   }
   sections() {
@@ -306,7 +306,7 @@ export class InterfaceHelp extends HelpPage {
         : [this.ifaceType];
       const ordered = [this.ifaceType, ...declared.filter((k) => k !== this.ifaceType)];
       return ordered.map(
-        (iface) => `godmode ${this.apiName} ${iface}${interfaceProviderUsage(iface)}`,
+        (iface) => `godmode ${this.apiName} ${iface}${interfaceRegistry.usage(iface)}`,
       );
     }
     const nav = this.getNav();

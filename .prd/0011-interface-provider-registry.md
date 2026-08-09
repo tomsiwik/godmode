@@ -1,4 +1,4 @@
-# 0011 — Interface provider registry
+# 0011 — Interface class registry
 
 **Status:** Review · **Level:** Architecture decision · **Date:** 2026-08-08
 
@@ -15,29 +15,29 @@ operations and arguments that interface exposes. Interface names are lowercase C
 tokens. This change does not introduce `godmode invoke`, change argument syntax, replace
 the response body, or change the compiled `Route` model.
 
-Replace the core's closed `api | graphql | mcp` set with an interface provider registry.
-A provider owns one interface name and supplies:
+Replace the core's closed `api | graphql | mcp` set with an interface class registry.
+An interface class owns one interface name and supplies:
 
 - the usage tail shown in help;
 - compilation from an extension's manifest source to installed interface data; and
-- creation of the runtime interface handler.
+- the runtime handler itself.
 
 The built-in API, GraphQL, and MCP interfaces register through this same seam. Manifest
-validation accepts a declared interface only when a provider with that name is loaded.
-Provider names use lowercase letters, numbers, and hyphens. Registration is
-first-owner-wins: a second provider cannot replace an existing provider with the same
+validation accepts a declared interface only when a class with that name is loaded.
+Interface names use lowercase letters, numbers, and hyphens. Registration is
+first-owner-wins: a second class cannot replace an existing class with the same
 name.
 
 An extension slug already namespaces its commands, so two extensions declaring `api`
 do not collide: `stripe api` and `github api` are distinct paths. The registry therefore
-owns interface-provider names, not every `<extension> <interface>` pair. Existing slug
+owns interface names, not every `<extension> <interface>` pair. Existing slug
 occupancy continues to prevent one extension from replacing another extension's
 top-level command.
 
-This is an in-process registry and built-in bootstrap, not a public executable-plugin
-loader. Loading provider code from an installed extension needs a separate decision
-about package resolution, compatibility, isolation, and trust. Until that exists, a
-manifest cannot make an unknown interface executable merely by naming it.
+An npm extension can export one interface class or an array from `./interface`. Godmode
+loads that module before manifest validation and compilation, then loads it again in a
+later CLI process before dispatch. The module is trusted executable package code; this
+mechanism provides no process isolation.
 
 ## Why this is the minimum useful registry
 
@@ -47,10 +47,10 @@ required editing core in each place, and help silently described every unfamilia
 interface as REST. That was a closed implementation even though extensions are meant to
 be extensible.
 
-One provider registration now defines acceptance, help syntax, compilation, and runtime
+One class registration now defines acceptance, help syntax, compilation, and runtime
 creation. Duplicate registration fails instead of making behavior depend on import
-order. The JSON Schema retains detailed schemas for built-in providers and permits an
-object for another registered provider; the runtime registry remains the authority for
+order. The JSON Schema retains detailed schemas for built-in interfaces and permits an
+object for another registered class; the runtime registry remains the authority for
 whether that key can execute.
 
 ## Points 3–5: evidence and limits
@@ -76,14 +76,14 @@ rejected before fetch. Without that requirement, expanding `Route` is unnecessar
 
 API/GraphQL route execution and MCP tool execution each call permission checks in their
 own control flow. The known raw-path and MCP-serving bypasses have been repaired, so
-this is not a claim of a current bypass. It is an extension-boundary risk: the provider
-API introduced here returns a handler with direct execution authority, and a future
-third-party provider could omit the same checks or produce different error behavior.
+this is not a claim of a current built-in bypass. It is an extension-boundary risk: an
+exported interface class has direct execution authority and can omit the same checks or
+produce different error behavior.
 
-This matters only when executable providers become third-party or when godmode promises
-that every effect passes through one invariant enforcement path. The stronger future
-boundary would have providers describe an execution request and let core wrap policy,
-credentials, and tracing. Its acceptance test should prove that a synthetic provider
+This matters when godmode promises that every effect passes through one invariant
+enforcement path. The stronger future
+boundary would have interface classes describe an execution request and let core wrap
+policy, credentials, and tracing. Its acceptance test should prove that a synthetic class
 cannot start an effect before the central policy decision. Building that runtime in this
 registry PR would mix two decisions.
 
@@ -96,15 +96,15 @@ the rest. Familiarity with native CLIs is a reason to keep these grammars instea
 forcing every source through an artificial `invoke` command.
 
 It becomes a substantive problem only if godmode later requires scripts to swap one
-interface provider for another without changing argv, or requires generic tooling to
+interface class for another without changing argv, or requires generic tooling to
 construct calls without consulting interface help/schema. Neither requirement has been
 accepted, so no unified operation grammar belongs in this change.
 
 ## Acceptance criteria
 
 - API, GraphQL, and MCP behavior and command forms remain unchanged.
-- Adding a synthetic lowercase provider requires no edit to a core interface union,
+- Adding a synthetic lowercase interface class requires no edit to a core interface union,
   accepted-name list, compiler map, runtime switch, or help switch.
-- The synthetic provider is used for both compilation and runtime handler creation.
-- Duplicate or non-lowercase provider names fail deterministically.
-- A manifest key without a loaded provider is rejected before installation.
+- A packaged `app` interface is used for both compilation and runtime dispatch.
+- Duplicate or non-lowercase interface names fail deterministically.
+- A manifest key without a loaded interface class is rejected before installation.

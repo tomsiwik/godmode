@@ -1,30 +1,36 @@
+import type {
+  InterfaceClass,
+  InterfaceContext,
+  InterfaceHandler,
+} from './interfaces/base.js';
+
 const INTERFACE_NAME = /^[a-z0-9][a-z0-9-]*$/;
 
-/** Registry with first-owner-wins semantics for extension interface providers. */
-export class InterfaceRegistry<T> {
-  private readonly providers = new Map<string, T>();
+/** Registry of the interface classes available in this process. */
+export class InterfaceRegistry {
+  private readonly classes = new Map<string, InterfaceClass>();
 
-  register(name: string, provider: T): void {
-    if (!INTERFACE_NAME.test(name)) {
+  register(InterfaceType: InterfaceClass): void {
+    const { key } = InterfaceType;
+    if (!INTERFACE_NAME.test(key)) {
       throw new Error(
-        `Invalid interface name '${name}' (expected lowercase letters, numbers, and hyphens)`,
+        `Invalid interface name '${key}' (expected lowercase letters, numbers, and hyphens)`,
       );
     }
-    if (this.providers.has(name)) {
-      throw new Error(`Interface '${name}' is already registered`);
-    }
-    this.providers.set(name, provider);
+    if (this.classes.has(key)) throw new Error(`Interface '${key}' is already registered`);
+    this.classes.set(key, InterfaceType);
   }
 
-  has(name: string): boolean {
-    return this.providers.has(name);
-  }
+  has(key: string): boolean { return this.classes.has(key); }
+  get(key: string): InterfaceClass | undefined { return this.classes.get(key); }
+  names(): string[] { return [...this.classes.keys()].sort(); }
+  usage(key: string): string { return this.classes.get(key)?.usage || ' <command> [args]'; }
 
-  get(name: string): T | undefined {
-    return this.providers.get(name);
-  }
-
-  names(): string[] {
-    return [...this.providers.keys()].sort();
+  create(ctx: InterfaceContext): InterfaceHandler {
+    const InterfaceType = this.classes.get(ctx.iface);
+    if (!InterfaceType) throw new Error(`Unknown interface: ${ctx.iface}`);
+    return new InterfaceType(ctx);
   }
 }
+
+export const interfaceRegistry = new InterfaceRegistry();
