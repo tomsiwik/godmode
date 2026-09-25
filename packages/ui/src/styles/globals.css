@@ -1,3 +1,4 @@
+@import '@fontsource-variable/inter/wght.css';
 @import 'tailwindcss';
 @import "tw-animate-css";
 @import "dither-plugin";
@@ -8,6 +9,7 @@
 @custom-variant dark (&:is(.dark *));
 
 @theme {
+  --font-sans: 'Inter Variable', ui-sans-serif, system-ui, sans-serif;
   --font-mono: 'Geist Mono', 'Fira Code', monospace;
 
   --color-background: var(--background);
@@ -255,6 +257,7 @@
 
   html {
     @apply font-sans;
+    font-weight: 350;
   }
 
   .line {
