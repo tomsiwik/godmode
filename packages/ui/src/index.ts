@@ -10,6 +10,8 @@ export * from './components/ui/navigation-menu';
 export * from './components/accordion';
 export * from './components/call-to-action';
 export * from './components/container';
+export { default as ElectricLogo } from './components/ElectricLogo';
+export type { ElectricLogoProps } from './components/ElectricLogo';
 export { default as Footer } from './components/footer';
 export { default as Header } from './components/header';
 export * from './components/logo';
