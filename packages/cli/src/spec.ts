@@ -30,6 +30,8 @@ export interface ManifestSource {
     api?: ApiInterfaceSource;
     graphql?: GraphqlInterfaceSource;
     mcp?: McpInterfaceSource;
+    command?: CommandInterfaceSource;
+    orchestrator?: OrchestratorInterfaceSource;
   };
   auth?: AuthConfig;
   headers?: Record<string, string>;
@@ -51,7 +53,29 @@ export interface McpInterfaceSource {
   url: string;
 }
 
-export type InterfaceKey = 'api' | 'graphql' | 'mcp';
+export interface StaticRouteSource {
+  name: string;
+  summary?: string;
+}
+
+export interface CommandRouteSource extends StaticRouteSource {
+  command: string;
+  args?: string[];
+}
+
+export interface CommandInterfaceSource {
+  commands: CommandRouteSource[];
+}
+
+export interface OrchestratorRouteSource extends StaticRouteSource {
+  call: string | string[];
+}
+
+export interface OrchestratorInterfaceSource {
+  calls: OrchestratorRouteSource[];
+}
+
+export type InterfaceKey = 'api' | 'graphql' | 'mcp' | 'command' | 'orchestrator';
 
 // ── route model (shared by all interfaces) ────────────────────
 
@@ -101,7 +125,28 @@ export interface McpInterfaceData extends McpInterfaceSource {
   _mcpTools?: Array<{ name: string; title?: string; description?: string; inputSchema?: unknown }>;
 }
 
-export type InterfaceData = ApiInterfaceData | GraphqlInterfaceData | McpInterfaceData;
+export interface CommandInterfaceData extends CommandInterfaceSource {
+  type: 'command';
+  specVersion: string;
+  versions: VersionConfig[];
+  resourceDescriptions: Record<string, string>;
+  routes: Route[];
+}
+
+export interface OrchestratorInterfaceData extends OrchestratorInterfaceSource {
+  type: 'orchestrator';
+  specVersion: string;
+  versions: VersionConfig[];
+  resourceDescriptions: Record<string, string>;
+  routes: Route[];
+}
+
+export type InterfaceData =
+  | ApiInterfaceData
+  | GraphqlInterfaceData
+  | McpInterfaceData
+  | CommandInterfaceData
+  | OrchestratorInterfaceData;
 
 /**
  * On-disk extension record. One per extension, holds every declared interface's
@@ -119,6 +164,8 @@ export interface MultiManifest {
     api?: ApiInterfaceData;
     graphql?: GraphqlInterfaceData;
     mcp?: McpInterfaceData;
+    command?: CommandInterfaceData;
+    orchestrator?: OrchestratorInterfaceData;
   };
 }
 
@@ -200,6 +247,8 @@ const parsers: Record<InterfaceKey, AnyParser | undefined> = {
   api: parseOpenApi,
   graphql: parseGraphQL,
   mcp: parseMcp,
+  command: undefined,
+  orchestrator: undefined,
 };
 
 /**
@@ -212,11 +261,39 @@ export async function compileInterface<K extends InterfaceKey>(
   source: ManifestSource,
 ): Promise<InterfaceData> {
   const parser = parsers[iface];
-  if (!parser) throw new Error(`Unknown interface '${iface}'`);
-
   // Construct the legacy ApiConfig the parsers expect.
   const ifaceSource = source.interfaces[iface];
   if (!ifaceSource) throw new Error(`Interface '${iface}' not declared on '${name}'`);
+
+  if (iface === 'command') {
+    const s = ifaceSource as CommandInterfaceSource;
+    return staticInterfaceData('command', s.commands) as CommandInterfaceData;
+  }
+
+  if (iface === 'orchestrator') {
+    const s = ifaceSource as OrchestratorInterfaceSource;
+    return staticInterfaceData('orchestrator', s.calls) as OrchestratorInterfaceData;
+  }
+
+  if (iface === 'mcp') {
+    const s = ifaceSource as McpInterfaceSource;
+    if (s.url.startsWith('stdio:')) {
+      const route = { name: 'run', summary: `Invoke ${s.url.slice('stdio:'.length)}` };
+      const data = staticRoutes([route]);
+      return {
+        ...data,
+        type: 'mcp',
+        url: s.url,
+        _mcpTools: [{
+          name: route.name,
+          description: route.summary,
+          inputSchema: { type: 'object', properties: {} },
+        }],
+      } as McpInterfaceData;
+    }
+  }
+
+  if (!parser) throw new Error(`Unknown interface '${iface}'`);
 
   const legacyConfig: ApiConfig = {
     slug: source.slug || name,
@@ -270,4 +347,49 @@ export async function compileInterface<K extends InterfaceKey>(
     url: s.url,
     _mcpTools: flat.config._mcpTools,
   } as McpInterfaceData;
+}
+
+function staticInterfaceData(
+  type: 'command',
+  routeSources: CommandRouteSource[],
+): CommandInterfaceData;
+function staticInterfaceData(
+  type: 'orchestrator',
+  routeSources: OrchestratorRouteSource[],
+): OrchestratorInterfaceData;
+function staticInterfaceData(
+  type: 'command' | 'orchestrator',
+  routeSources: Array<CommandRouteSource | OrchestratorRouteSource>,
+): CommandInterfaceData | OrchestratorInterfaceData {
+  const { routes, resourceDescriptions } = staticRoutes(routeSources);
+  const base = {
+    type,
+    specVersion: 'static',
+    versions: [],
+    resourceDescriptions,
+    routes,
+  };
+  if (type === 'command') {
+    return { ...base, type, commands: routeSources as CommandRouteSource[] };
+  }
+  return { ...base, type, calls: routeSources as OrchestratorRouteSource[] };
+}
+
+function staticRoutes(routeSources: Array<Pick<StaticRouteSource, 'name' | 'summary'>>): {
+  routes: Route[];
+  resourceDescriptions: Record<string, string>;
+} {
+  const routes: Route[] = routeSources.map((route) => ({
+    path: route.name,
+    method: 'post',
+    summary: route.summary || '',
+    version: '',
+    segments: [{ value: route.name, isParam: false }],
+  }));
+  const resourceDescriptions = Object.fromEntries(
+    routeSources
+      .filter((route) => route.summary)
+      .map((route) => [route.name, route.summary as string]),
+  );
+  return { routes, resourceDescriptions };
 }

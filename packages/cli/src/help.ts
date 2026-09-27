@@ -106,6 +106,8 @@ const INTERFACE_LABEL: Record<string, string> = {
   api: 'API',
   graphql: 'GraphQL',
   mcp: 'MCP',
+  command: 'Command',
+  orchestrator: 'Orchestrator',
   skill: 'Skill',
 };
 
@@ -204,6 +206,7 @@ export class ExtHelp extends HelpPage {
         ['update <name>', 'Re-fetch spec, rebuild routes'],
         ['list', 'Show installed extensions'],
         ['create', 'Interactive manifest wizard'],
+        ['skill <name>', 'Print generated SKILL.md'],
       ] as string[][] },
       { title: 'Options:', rows: [
         ['-g, --global', 'Apply to ~/.godmode (default: <cwd>/.godmode)'],

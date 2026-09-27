@@ -13,6 +13,8 @@ import { execute } from '@godmode-cli/interface-api/request';
 import { validateGraphQLFlags } from '@godmode-cli/interface-graphql';
 import { validateMcpFlags, executeMcpTool } from '@godmode-cli/interface-mcp';
 import { runMcp } from '@godmode-cli/interface-mcp/command';
+import { spawnSync } from 'node:child_process';
+import { resolve } from 'node:path';
 import type { ParsedArgs } from './args.js';
 import { readStdin } from './args.js';
 import { loadManifest, GODMODE_HOME } from './config.js';
@@ -25,7 +27,7 @@ import {
   resourceFromTool,
   suggestedAllowRule,
 } from './permissions.js';
-import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
+import type { CommandInterfaceData, InterfaceKey, Manifest, MultiManifest, OrchestratorInterfaceData, Route } from './spec.js';
 
 interface InterfaceCtx {
   iface: InterfaceKey;
@@ -150,7 +152,7 @@ function reportNoMatch(ctx: InterfaceCtx): void {
     process.stderr.write('\nSimilar:\n');
     const seen = new Set<string>();
     for (const r of similar) {
-      const p = r.segments.map((s) => (s.isParam ? `{${s.value}}` : s.value)).join(' ');
+      const p = r.segments.map((s: { value: string; isParam: boolean }) => (s.isParam ? `{${s.value}}` : s.value)).join(' ');
       if (seen.has(p)) continue;
       seen.add(p);
       process.stderr.write(`  ${p}\n`);
@@ -218,11 +220,115 @@ export class McpInterface extends Interface {
   }
 }
 
+export class CommandInterface extends Interface {
+  validate(): string | null {
+    return validateStaticInvocation(this.ctx, 'command');
+  }
+
+  async execute(): Promise<void> {
+    const { manifest, multi, parsed, extensionName } = this.ctx;
+    const match = matchRoute(manifest, parsed.segments, 'post');
+    if (!match) {
+      reportNoMatch(this.ctx);
+      process.exit(EXIT_CODES.notFound);
+    }
+
+    const check = checkPermission({
+      extension: extensionName,
+      resource: resourceFromSegments(match.route.segments),
+      method: 'command',
+    });
+    if (!check.allowed) {
+      process.stderr.write(`Blocked: ${check.reason}\n`);
+      process.exit(EXIT_CODES.permissionDenied);
+    }
+
+    const data = multi.interfaces.command as CommandInterfaceData | undefined;
+    const commandRoute = data?.commands.find((route) => route.name === match.route.path);
+    if (!commandRoute) throw new Error(`Command route '${match.route.path}' is not configured`);
+
+    const args = [...(commandRoute.args ?? []), ...Object.values(parsed.body)];
+    if (parsed.dryRun) {
+      process.stdout.write(`RUN ${[commandRoute.command, ...args].join(' ')}\n`);
+      return;
+    }
+
+    const result = spawnSync(commandRoute.command, args, { encoding: 'utf-8', stdio: 'pipe' });
+    if (result.stdout) process.stdout.write(result.stdout);
+    if (result.stderr) process.stderr.write(result.stderr);
+    if (result.status && result.status !== 0) process.exit(result.status);
+  }
+}
+
+export class OrchestratorInterface extends Interface {
+  validate(): string | null {
+    return validateStaticInvocation(this.ctx, 'orchestrator');
+  }
+
+  async execute(): Promise<void> {
+    const { manifest, multi, parsed, extensionName } = this.ctx;
+    const match = matchRoute(manifest, parsed.segments, 'post');
+    if (!match) {
+      reportNoMatch(this.ctx);
+      process.exit(EXIT_CODES.notFound);
+    }
+
+    const check = checkPermission({
+      extension: extensionName,
+      resource: resourceFromSegments(match.route.segments),
+      method: 'orchestrator',
+    });
+    if (!check.allowed) {
+      process.stderr.write(`Blocked: ${check.reason}\n`);
+      process.exit(EXIT_CODES.permissionDenied);
+    }
+
+    const data = multi.interfaces.orchestrator as OrchestratorInterfaceData | undefined;
+    const route = data?.calls.find((candidate) => candidate.name === match.route.path);
+    if (!route) throw new Error(`Orchestrator route '${match.route.path}' is not configured`);
+
+    const calls = Array.isArray(route.call) ? route.call : [route.call];
+    for (const call of calls) {
+      if (parsed.dryRun) {
+        process.stdout.write(`GODMODE ${call}\n`);
+        continue;
+      }
+      const argv = splitCommandLine(call);
+      const result = spawnSync(process.execPath, [resolve(import.meta.dirname, 'index.js'), ...argv], {
+        encoding: 'utf-8',
+        stdio: 'pipe',
+      });
+      if (result.stdout) process.stdout.write(result.stdout);
+      if (result.stderr) process.stderr.write(result.stderr);
+      if (result.status && result.status !== 0) process.exit(result.status);
+    }
+  }
+}
+
+function validateStaticInvocation(ctx: InterfaceCtx, label: string): string | null {
+  if (ctx.parsed.explicitMethod && ctx.parsed.method !== 'post') {
+    return `${label} routes are invoked with POST semantics; omit the HTTP method.`;
+  }
+  return null;
+}
+
+function splitCommandLine(input: string): string[] {
+  const out: string[] = [];
+  const re = /"([^"]*)"|'([^']*)'|(\S+)/g;
+  let match: RegExpExecArray | null;
+  while ((match = re.exec(input)) !== null) {
+    out.push(match[1] ?? match[2] ?? match[3]);
+  }
+  return out;
+}
+
 export function getInterface(ctx: InterfaceCtx): Interface {
   switch (ctx.iface) {
     case 'api':     return new ApiInterface(ctx);
     case 'graphql': return new GraphqlInterface(ctx);
     case 'mcp':     return new McpInterface(ctx);
+    case 'command': return new CommandInterface(ctx);
+    case 'orchestrator': return new OrchestratorInterface(ctx);
     default:
       throw new Error(`Unknown interface: ${ctx.iface}`);
   }

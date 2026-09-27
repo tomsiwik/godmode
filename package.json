@@ -6,9 +6,9 @@
     "build": "turbo build",
     "dev": "turbo dev",
     "test": "turbo test",
+    "test:vitest": "vitest run",
     "lint": "turbo lint",
     "format": "prettier --write \"**/*.{ts,tsx,md}\"",
-    "test:vitest": "vitest run",
     "changeset": "changeset",
     "version": "changeset version",
     "release": "turbo build && changeset publish"

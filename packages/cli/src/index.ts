@@ -24,7 +24,7 @@ loadEnv();
 // level: `godmode stripe --help` → extension overview,
 // `godmode stripe api --help` → interface help, etc.
 
-const VALID_INTERFACES = new Set<InterfaceKey>(['api', 'graphql', 'mcp', 'skill']);
+const VALID_INTERFACES = new Set<InterfaceKey | 'skill'>(['api', 'graphql', 'mcp', 'command', 'orchestrator', 'skill']);
 
 async function main() {
   const args = process.argv.slice(2);
