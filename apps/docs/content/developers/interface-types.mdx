@@ -1,6 +1,6 @@
 ---
 title: Interface types
-description: When to pick `api`, `graphql`, or `mcp` for your extension.
+description: Built-in and package-defined interfaces for extensions.
 ---
 
 Every extension declares one or more interfaces. The interface dictates how godmode dispatches calls and what `--help` looks like at the inner levels.
@@ -12,6 +12,7 @@ Every extension declares one or more interfaces. The interface dictates how godm
 | **`api`** | OpenAPI 3.x spec | REST APIs (most third-party services) | [stripe](/extensions/stripe), [openai](/extensions/openai), [slack](/extensions/slack), [petstore](/extensions/petstore) |
 | **`graphql`** | SDL file or introspectable endpoint | GraphQL APIs | [github](/extensions/github) |
 | **`mcp`** | MCP server (stdio or HTTP) | Existing MCP servers, custom tooling | [context7](/extensions/context7), [claude-code-channels](/extensions/claude-code-channels) |
+| package-defined | Exported interface class | Desktop apps, device control, or another invocation model | Your npm extension |
 
 ## Decision tree
 
@@ -24,8 +25,7 @@ Does the upstream publish an OpenAPI 3.x spec?
     │   └── No
     └── Is there already an MCP server for it?
         ├── Yes → mcp (point at the existing server)
-        └── No → write your own MCP server in a package, declare type=mcp,
-                 OR file a feature request upstream for an OpenAPI spec
+        └── No → export a package-defined interface for the native interaction model
 ```
 
 ## `api` (REST)
@@ -89,6 +89,68 @@ interfaces:
 ```
 
 The package's `package.json` ships the binary; godmode spawns it on demand. See [`extensions/claude-code-channels`](/extensions/claude-code-channels) for a complete example.
+
+## Package-defined interfaces
+
+Use an interface class when `api`, `graphql`, and `mcp` do not describe how callers
+interact with the extension. For example, an application interface can expose
+`godmode finder app open document.pdf` without teaching core about an `app` keyword.
+
+Export the class from `package.json`:
+
+```json
+{
+  "exports": {
+    "./manifest": "./manifest.yaml",
+    "./interface": "./dist/app.js"
+  }
+}
+```
+
+The default export is one interface class, or an array when the package defines more
+than one. Each class owns its key, help usage, installation compiler, and runtime
+behavior:
+
+```ts
+import { Interface, type InterfaceData, type ManifestSource } from 'godmode/interface';
+
+export default class AppInterface extends Interface {
+  static readonly key = 'app';
+  static readonly usage = ' <action> <application>';
+
+  static async compile(_name: string, source: ManifestSource): Promise<InterfaceData> {
+    const app = source.interfaces.app as { application: string };
+    return {
+      type: this.key,
+      application: app.application,
+      specVersion: 'app-v1',
+      versions: [],
+      resourceDescriptions: {},
+      routes: [],
+    };
+  }
+
+  async execute(): Promise<void> {
+    const [action, application] = this.ctx.parsed.segments;
+    // Perform the declared app action and write its result to stdout.
+  }
+}
+```
+
+The manifest declares the same lowercase key:
+
+```yaml
+interfaces:
+  app:
+    application: Finder
+```
+
+The CLI loads the class before validating and compiling the manifest, records the
+compiled data, and loads the same class for later invocations. A second package cannot
+replace an interface key already registered in the process.
+
+An interface module is executable package code. Installing or invoking it gives that
+code the same process authority as godmode; use only packages you trust.
 
 ## Multiple interfaces
 
