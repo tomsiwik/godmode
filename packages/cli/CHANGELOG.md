@@ -1,5 +1,11 @@
 # godmode
 
+## 0.0.4
+
+### Patch Changes
+
+- d1e2995: Replace the fixed interface set with a provider registry for help, compilation, and runtime dispatch.
+
 ## 0.0.3
 
 ### Patch Changes
