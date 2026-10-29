@@ -155,6 +155,26 @@ describe('ExtensionOverview', () => {
     expect(out).toContain('-v, --version');
     expect(out).not.toContain('-H, --header');
   });
+
+  it('does not describe extension-defined interfaces as REST operations', () => {
+    const app: MultiManifest = {
+      name: 'app fixture',
+      slug: 'app-fixture',
+      interfaces: {
+        app: {
+          type: 'app',
+          specVersion: 'test-v1',
+          versions: [],
+          resourceDescriptions: {},
+          routes: [],
+        },
+      },
+    };
+
+    expect(new ExtensionOverview(app).usage()).toEqual([
+      'godmode app-fixture app <command> [args]',
+    ]);
+  });
 });
 
 // ── ExtensionVersionPage ──────────────────────────────────

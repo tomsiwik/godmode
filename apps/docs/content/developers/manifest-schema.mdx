@@ -11,7 +11,7 @@ Source of truth: [`packages/cli/schemas/manifest.schema.json`](https://github.co
 name:           # human-readable
 slug:           # CLI argument; defaults to lowercased name
 description:    # one-line summary
-interfaces:     # at least one of api / graphql / mcp
+interfaces:     # one or more registered lowercase interface keys
 auth:           # optional, shared across all interfaces
 headers:        # optional, sent with every request
 ```
@@ -21,7 +21,7 @@ headers:        # optional, sent with every request
 | `name` | string | ✅ | Display name. Shown in `--help` headings. |
 | `slug` | string | — | URL-safe id. Pattern: `^[a-z0-9][a-z0-9-]*$`. Defaults to lowercased `name`. |
 | `description` | string | — | One-line summary. Shown in `godmode --help` extension listing. |
-| `interfaces` | object | ✅ | Map of interface name → config. At least one of `api`, `graphql`, `mcp`. |
+| `interfaces` | object | ✅ | Map of registered interface name → interface-specific config. |
 | `auth` | object | — | See [Auth types](/developers/auth-types). |
 | `headers` | `{string: string}` | — | Default headers for every request. Auth headers don't go here. |
 
@@ -129,8 +129,10 @@ The CLI validates every manifest against the schema on `ext install` / `ext upda
 
 ```
 ext install ./my-ext failed:
-  manifest.yaml /interfaces: must NOT have additional properties
-    additionalProperty: "rest"     ← did you mean "api"?
+  manifest.yaml: unknown interface 'app' (registered: api, graphql, mcp)
 ```
+
+Built-in keys receive the detailed validation above. Another lowercase key is accepted
+only when the npm package exports a matching [interface class](/developers/interface-types#package-defined-interfaces).
 
 You can validate ahead of time with any JSON Schema validator pointed at the schema URL above.

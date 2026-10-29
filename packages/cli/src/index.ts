@@ -1,13 +1,12 @@
 import { loadEnv } from './env.js';
 import {
-  loadManifest,
-  loadMultiManifest,
-  findInstalledManifestSync,
+  findInstalledManifest,
+  config,
 } from './config.js';
-import type { InterfaceKey } from './spec.js';
+import { projectManifest, type InterfaceKey, type MultiManifest } from './spec.js';
 import { parseArgs } from './args.js';
 import { showHelp, showExtensionOverview, showExtensionVersion, showVersion } from './help.js';
-import { getInterface } from './interfaces.js';
+import { interfaceRegistry } from './interface-registry.js';
 import { EXIT_CODES } from './exit-codes.js';
 import { warnSettingsErrors } from './settings.js';
 import { BUILTINS } from './builtins.js';
@@ -23,8 +22,6 @@ loadEnv();
 // the user picks one explicitly each time. Nested help drills at every
 // level: `godmode stripe --help` → extension overview,
 // `godmode stripe api --help` → interface help, etc.
-
-const VALID_INTERFACES = new Set<InterfaceKey>(['api', 'graphql', 'mcp', 'skill']);
 
 async function main() {
   const args = process.argv.slice(2);
@@ -51,7 +48,7 @@ async function main() {
   }
 
   // User extensions — interface is required.
-  const multi = findInstalledManifestSync(extensionSlug);
+  const multi = await findInstalledManifest(extensionSlug);
   if (!multi) {
     process.stderr.write(`'${extensionSlug}' is not an installed extension.\n`);
     process.stderr.write(`Try 'godmode ext list' to see installed extensions.\n`);
@@ -75,7 +72,7 @@ async function main() {
   }
 
   // Interface is mandatory. First token MUST be a declared interface.
-  if (!VALID_INTERFACES.has(first as InterfaceKey)) {
+  if (!interfaceRegistry.has(first)) {
     process.stderr.write(`Missing interface.\n`);
     process.stderr.write(`'${extensionSlug}' declares: ${declared.join(', ')}.\n`);
     process.stderr.write(`Try 'godmode ${extensionSlug} ${declared[0]} ${first}' or 'godmode ${extensionSlug} --help'.\n`);
@@ -88,12 +85,17 @@ async function main() {
     process.exit(EXIT_CODES.usage);
   }
 
-  await runInterface(first as InterfaceKey, extensionSlug, rest.slice(1));
+  await runInterface(first as InterfaceKey, extensionSlug, rest.slice(1), multi);
 }
 
 // ── interface dispatch ──
 
-async function runInterface(iface: string, extensionName: string, rest: string[]) {
+async function runInterface(
+  iface: string,
+  extensionName: string,
+  rest: string[],
+  multi: MultiManifest,
+) {
   if (iface === 'skill') {
     process.stderr.write(`Skill interface not yet implemented.\n`);
     process.exit(EXIT_CODES.usage);
@@ -102,18 +104,22 @@ async function runInterface(iface: string, extensionName: string, rest: string[]
   // Intercept --version anywhere in the arg list — shows the extension's
   // spec version(s) regardless of nesting depth.
   if (rest.includes('--version') || rest.includes('-v')) {
-    const multi = await loadMultiManifest(extensionName);
     showExtensionVersion(multi);
     return;
   }
 
   const ifaceKey = iface as InterfaceKey;
   const parsed = parseArgs(rest);
-  const multi = await loadMultiManifest(extensionName);
-  const manifest = await loadManifest(extensionName, ifaceKey);
+  const manifest = projectManifest(multi, ifaceKey);
 
-  const handler = getInterface({
-    iface: ifaceKey, extensionName, manifest, multi, parsed, rawRest: rest,
+  const handler = interfaceRegistry.create({
+    iface: ifaceKey,
+    extensionName,
+    manifest,
+    multi,
+    parsed,
+    rawRest: rest,
+    config,
   });
 
   if (parsed.help) {

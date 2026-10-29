@@ -15,7 +15,8 @@ my-extension/
 └── LICENSE
 ```
 
-That's the whole thing. No build step, no JS, no TypeScript — unless you're shipping a [package-based extension](/developers/interface-types#package-based-mcp) with its own MCP server implementation.
+That's the whole thing for a built-in interface. A package-defined interface also ships
+its compiled interface class.
 
 ## `package.json` shape
 
@@ -46,8 +47,25 @@ Three things godmode looks at:
 | Field | Why |
 |---|---|
 | `exports."./manifest"` | How `godmode ext install` finds the manifest. **Required.** |
-| `files` | What npm packs into the tarball. Keep it minimal — no node_modules, no source code, no build artifacts. |
+| `exports."./interface"` | Interface class loaded by godmode. Required only for package-defined interface keys. |
+| `files` | What npm packs into the tarball. Keep it minimal and include `dist` only when the extension exports executable code. |
 | `keywords: ["godmode-extension"]` | How extension catalogs/search tools discover your package. Recommended. |
+
+For a package-defined interface, include its compiled module in `files` and export it:
+
+```json
+{
+  "exports": {
+    "./manifest": "./manifest.yaml",
+    "./interface": "./dist/app.js"
+  },
+  "files": ["manifest.yaml", "dist", "README.md", "LICENSE"]
+}
+```
+
+See [Package-defined interfaces](/developers/interface-types#package-defined-interfaces)
+for the class contract. The module executes during installation and invocation, so
+publishing one changes the extension from declarative data to trusted executable code.
 
 ## Publish
 

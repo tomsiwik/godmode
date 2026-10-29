@@ -27,10 +27,15 @@
     "./spec": "./src/spec.ts",
     "./config": "./src/config.ts",
     "./permissions": "./src/permissions.ts",
-    "./help": "./src/help.ts"
+    "./help": "./src/help.ts",
+    "./interface": {
+      "types": "./src/interface-sdk.ts",
+      "import": "./dist/interface-sdk.js"
+    }
   },
   "files": [
     "dist",
+    "src",
     "LICENSE",
     "README.md"
   ],

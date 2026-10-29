@@ -1,17 +1,20 @@
 import { resolve, basename, dirname, extname, isAbsolute, parse as parsePath, relative } from 'node:path';
 import { homedir } from 'node:os';
+import { pathToFileURL } from 'node:url';
 import { existsSync, readFileSync } from 'node:fs';
 import { mkdir, readFile, writeFile, readdir, unlink, access, rename, rm } from 'node:fs/promises';
 import { execFileSync } from 'node:child_process';
 import { parse as parseYaml } from 'yaml';
+import './builtin-interfaces.js';
 import {
-  compileInterface,
   projectManifest,
   type InterfaceKey,
   type Manifest,
   type ManifestSource,
   type MultiManifest,
 } from './spec.js';
+import { interfaceRegistry } from './interface-registry.js';
+import type { InterfaceClass } from './interfaces.js';
 import { BUILTINS } from './builtins.js';
 
 /** Global config directory — always `~/.godmode`. */
@@ -20,8 +23,6 @@ export const GODMODE_HOME = resolve(homedir(), '.godmode');
 /** Scope for reads and writes. `project` = the nearest `.godmode/` walking
  *  upward from cwd; `global` = `~/.godmode`. */
 export type Scope = 'project' | 'global';
-
-const INTERFACE_KEYS: readonly InterfaceKey[] = ['api', 'graphql', 'mcp'] as const;
 
 /** A slug is occupied by whichever extension registered it: built-ins ship
  *  registered, installed extensions register on install. Re-installing the
@@ -154,9 +155,9 @@ function validateSource(raw: unknown, origin: string): ManifestSource {
     throw new Error(`${origin}: 'interfaces' must be an object with at least one key`);
   }
   for (const key of Object.keys(m.interfaces)) {
-    if (!INTERFACE_KEYS.includes(key as InterfaceKey)) {
+    if (!interfaceRegistry.has(key)) {
       throw new Error(
-        `${origin}: unknown interface '${key}' (valid: ${INTERFACE_KEYS.join(', ')})`,
+        `${origin}: unknown interface '${key}' (registered: ${interfaceRegistry.names().join(', ')})`,
       );
     }
   }
@@ -186,18 +187,18 @@ async function loadSourceFromFile(filePath: string): Promise<{ source: ManifestS
 }
 
 function absolutizeSource(source: ManifestSource, dir: string): ManifestSource {
-  const interfaces: ManifestSource['interfaces'] = {};
-  if (source.interfaces.api) interfaces.api = { ...source.interfaces.api };
-  if (source.interfaces.graphql) interfaces.graphql = { ...source.interfaces.graphql };
-  if (source.interfaces.mcp) interfaces.mcp = { ...source.interfaces.mcp };
+  const interfaces: ManifestSource['interfaces'] = Object.fromEntries(
+    Object.entries(source.interfaces).map(([name, config]) => [name, config ? { ...config } : config]),
+  );
   const next: ManifestSource = {
     ...source,
     interfaces,
   };
   for (const iface of ['api', 'graphql'] as const) {
-    const spec = next.interfaces[iface]?.spec;
+    const config = next.interfaces[iface] as { spec?: string } | undefined;
+    const spec = config?.spec;
     if (spec && !/^[a-z][a-z0-9+.-]*:/i.test(spec) && !isAbsolute(spec)) {
-      next.interfaces[iface]!.spec = resolve(dir, spec);
+      config.spec = resolve(dir, spec);
     }
   }
   return next;
@@ -207,20 +208,63 @@ async function loadSourceFromPackageDir(pkgDir: string): Promise<ManifestSource 
   const pkgPath = resolve(pkgDir, 'package.json');
   if (!(await exists(pkgPath))) return null;
   const pkg = JSON.parse(await readFile(pkgPath, 'utf-8')) as {
-    exports?: Record<string, string | { default?: string }>;
+    exports?: Record<string, PackageExport>;
   };
-  const manifestExport = pkg.exports?.['./manifest'];
-  const manifestPath = typeof manifestExport === 'string'
-    ? manifestExport
-    : manifestExport?.default;
+  const manifestPath = resolvePackageExport(pkg.exports?.['./manifest']);
   if (!manifestPath) {
     throw new Error(`${pkgPath}: missing exports["./manifest"]`);
   }
-  const loaded = await loadSourceFromFile(assertContained(pkgDir, resolve(pkgDir, manifestPath), 'Manifest export'));
+  const manifestFile = assertContained(pkgDir, resolve(pkgDir, manifestPath), 'Manifest export');
+  if (!(await exists(manifestFile))) {
+    throw new Error(`${pkgPath}: exports["./manifest"] does not point to a readable manifest`);
+  }
+  await loadPackageInterface(pkgDir, pkg.exports?.['./interface']);
+  const loaded = await loadSourceFromFile(manifestFile);
   if (!loaded) {
     throw new Error(`${pkgPath}: exports["./manifest"] does not point to a readable manifest`);
   }
   return loaded.source;
+}
+
+const loadedInterfaceModules = new Set<string>();
+type PackageExport = string | { default?: string; import?: string };
+
+function resolvePackageExport(value: PackageExport | undefined): string | undefined {
+  return typeof value === 'string' ? value : value?.import || value?.default;
+}
+
+async function loadPackageInterface(
+  pkgDir: string,
+  interfaceExport: PackageExport | undefined,
+): Promise<void> {
+  const relativePath = resolvePackageExport(interfaceExport);
+  if (!relativePath) return;
+  const modulePath = assertContained(pkgDir, resolve(pkgDir, relativePath), 'Interface export');
+  if (loadedInterfaceModules.has(modulePath)) return;
+
+  const module = await import(pathToFileURL(modulePath).href) as { default?: unknown };
+  const exported = Array.isArray(module.default) ? module.default : [module.default];
+  if (!module.default || exported.some((value) => !isInterfaceClass(value))) {
+    throw new Error(
+      `${modulePath}: default export must be an interface class or an array of interface classes`,
+    );
+  }
+  for (const InterfaceType of exported as InterfaceClass[]) interfaceRegistry.register(InterfaceType);
+  loadedInterfaceModules.add(modulePath);
+}
+
+function isInterfaceClass(value: unknown): value is InterfaceClass {
+  if (typeof value !== 'function') return false;
+  const candidate = value as unknown as InterfaceClass;
+  const prototype = (value as { prototype?: Record<string, unknown> }).prototype;
+  return typeof candidate.key === 'string'
+    && typeof candidate.usage === 'string'
+    && typeof candidate.compile === 'function'
+    && !!prototype
+    && typeof prototype.handleEmpty === 'function'
+    && typeof prototype.validate === 'function'
+    && typeof prototype.execute === 'function'
+    && typeof prototype.showHelp === 'function';
 }
 
 async function resolveSource(input: string): Promise<{ name: string; source: ManifestSource; dir: string }> {
@@ -262,9 +306,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
   if (resolved) {
     const { name, source } = resolved;
     assertSlugFree(source.slug || name, scope);
-    const ifaceKeys = Object.keys(source.interfaces).filter((k) =>
-      INTERFACE_KEYS.includes(k as InterfaceKey),
-    ) as InterfaceKey[];
+    const ifaceKeys = Object.keys(source.interfaces) as InterfaceKey[];
 
     if (ifaceKeys.length > 0) {
       const multi: MultiManifest = {
@@ -278,7 +320,9 @@ export async function addApi(input: string, scope: Scope = 'project') {
       };
 
       for (const iface of ifaceKeys) {
-        const data = await compileInterface(iface, name, source);
+        const InterfaceType = interfaceRegistry.get(iface);
+        if (!InterfaceType) throw new Error(`Unknown interface '${iface}'`);
+        const data = await InterfaceType.compile(name, source);
         (multi.interfaces as Record<string, unknown>)[iface] = data;
       }
 
@@ -327,9 +371,7 @@ export async function addApi(input: string, scope: Scope = 'project') {
   if (packageSource) {
     const slug = packageSource.slug || name;
     if (slug !== name) assertSlugFree(slug, scope, packageName);
-    const ifaceKeys = Object.keys(packageSource.interfaces).filter((k) =>
-      INTERFACE_KEYS.includes(k as InterfaceKey),
-    ) as InterfaceKey[];
+    const ifaceKeys = Object.keys(packageSource.interfaces) as InterfaceKey[];
     const multi: MultiManifest = {
       name: packageSource.name,
       slug,
@@ -341,7 +383,9 @@ export async function addApi(input: string, scope: Scope = 'project') {
       interfaces: {},
     };
     for (const iface of ifaceKeys) {
-      const data = await compileInterface(iface, slug, packageSource);
+      const InterfaceType = interfaceRegistry.get(iface);
+      if (!InterfaceType) throw new Error(`Unknown interface '${iface}'`);
+      const data = await InterfaceType.compile(slug, packageSource);
       (multi.interfaces as Record<string, unknown>)[iface] = data;
     }
     await writeFile(resolve(extensionsDir, `${slug}.json`), JSON.stringify(multi, null, 2));
@@ -452,14 +496,29 @@ export async function listApis() {
 
 /** Reads the manifest from the first scope that has it. Project scope
  *  wins over global. */
-export async function loadMultiManifest(name: string): Promise<MultiManifest> {
+export async function findInstalledManifest(name: string): Promise<MultiManifest | null> {
   for (const scope of ['project', 'global'] as const) {
     const dir = scopeExtensionsDirSync(scope);
     if (!dir) continue;
     const path = resolve(dir, `${name}.json`);
     if (!existsSync(path)) continue;
-    return JSON.parse(await readFile(path, 'utf-8'));
+    const manifest = JSON.parse(await readFile(path, 'utf-8')) as MultiManifest;
+    if (manifest.packageName) {
+      const scopeRoot = dirname(dir);
+      const pkgDir = packageInstallDir(scopeRoot, manifest.packageName);
+      const pkg = JSON.parse(await readFile(resolve(pkgDir, 'package.json'), 'utf-8')) as {
+        exports?: Record<string, PackageExport>;
+      };
+      await loadPackageInterface(pkgDir, pkg.exports?.['./interface']);
+    }
+    return manifest;
   }
+  return null;
+}
+
+export async function loadMultiManifest(name: string): Promise<MultiManifest> {
+  const manifest = await findInstalledManifest(name);
+  if (manifest) return manifest;
   process.stderr.write(`Extension "${name}" not found. Run: godmode ext install ${name}\n`);
   process.exit(1);
 }
@@ -504,3 +563,14 @@ export function findInstalledManifestSync(name: string): MultiManifest | null {
   }
   return null;
 }
+
+/** Runtime services supplied to interface instances. */
+export class Config {
+  constructor(readonly godmodeHome: string = GODMODE_HOME) {}
+
+  loadManifest(name: string, iface?: InterfaceKey): Promise<Manifest> {
+    return loadManifest(name, iface);
+  }
+}
+
+export const config = new Config();

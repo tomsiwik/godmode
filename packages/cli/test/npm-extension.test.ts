@@ -76,6 +76,60 @@ describe('npm extension install', () => {
     );
   });
 
+  it('loads a custom interface class exported by an extension package', async () => {
+    const root = await mkdtemp(resolve(tmpdir(), 'godmode-custom-interface-'));
+    const pkg = resolve(root, 'app-extension');
+    await mkdir(pkg, { recursive: true });
+    await writeFile(resolve(pkg, 'package.json'), JSON.stringify({
+      name: '@example/godmode-app',
+      version: '1.0.0',
+      type: 'module',
+      exports: {
+        './manifest': './extension.yaml',
+        './interface': { import: './app-interface.js' },
+      },
+    }, null, 2));
+    await writeFile(resolve(pkg, 'extension.yaml'), [
+      'name: App fixture',
+      'slug: app-fixture',
+      'interfaces:',
+      '  app:',
+      '    application: Finder',
+      '',
+    ].join('\n'));
+    await writeFile(resolve(pkg, 'app-interface.js'), `
+export default class AppInterface {
+  static key = 'app';
+  static usage = ' <action> <application>';
+
+  static async compile(_name, source) {
+    return {
+      type: 'app',
+      application: source.interfaces.app.application,
+      specVersion: 'app-v1',
+      versions: [],
+      resourceDescriptions: {},
+      routes: [],
+    };
+  }
+
+  constructor(ctx) { this.ctx = ctx; }
+  showHelp() { process.stdout.write('Usage: godmode app-fixture app <action> <application>\\n'); }
+  async handleEmpty() { this.showHelp(); }
+  validate() { return null; }
+  async execute() { process.stdout.write(this.ctx.parsed.segments.join(':') + '\\n'); }
+}
+`);
+
+    const install = gmResult(root, 'ext', 'install', pkg);
+    expect(install.status).toBe(0);
+    expect(install.output).toContain('Registered "app-fixture"');
+    expect(gmIn(root, 'app-fixture', '--help')).toContain(
+      'godmode app-fixture app <action> <application>',
+    );
+    expect(gmIn(root, 'app-fixture', 'app', 'open', 'Finder')).toBe('open:Finder');
+  });
+
   it('does not delete outside node_modules when an installed manifest is tampered with', async () => {
     const root = await mkdtemp(resolve(tmpdir(), 'godmode-npm-ext-'));
     const victim = resolve(root, 'victim');

@@ -1,21 +1,19 @@
-import { describe, it, expect, beforeAll } from 'vitest';
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { execSync } from 'node:child_process';
-import { existsSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { homedir } from 'node:os';
+import { tmpdir } from 'node:os';
 import { rootHelpRules, subHelpRules, versionRules, type Rule } from '../src/help-rules.js';
 
 const CLI = resolve(__dirname, '..', 'dist', 'index.js');
-const GODMODE_HOME =
-  process.platform === 'linux' && process.env.XDG_CONFIG_HOME
-    ? resolve(process.env.XDG_CONFIG_HOME, 'godmode')
-    : resolve(homedir(), '.godmode');
+const FIXTURE_ROOT = mkdtempSync(resolve(tmpdir(), 'godmode-help-compliance-'));
+const FIXTURE_EXTENSIONS = resolve(FIXTURE_ROOT, '.godmode', 'extensions');
 
 function gm(...args: string[]): string {
   try {
     return execSync(
       `node ${JSON.stringify(CLI)} ${args.map((a) => JSON.stringify(a)).join(' ')} 2>&1`,
-      { encoding: 'utf-8', timeout: 10_000 },
+      { cwd: FIXTURE_ROOT, encoding: 'utf-8', timeout: 10_000 },
     );
   } catch (e) {
     return ((e as { stdout?: string }).stdout ?? '');
@@ -23,7 +21,7 @@ function gm(...args: string[]): string {
 }
 
 function extRegistered(name: string): boolean {
-  return existsSync(resolve(GODMODE_HOME, 'apis', `${name}.json`));
+  return existsSync(resolve(FIXTURE_EXTENSIONS, `${name}.json`));
 }
 
 function assertRule(output: string, rule: Rule, label: string) {
@@ -50,6 +48,32 @@ const EXTENSIONS = [
   { name: 'slack', iface: 'api' },
   { name: 'stripe', iface: 'api' },
 ] as const;
+
+mkdirSync(FIXTURE_EXTENSIONS, { recursive: true });
+for (const { name, iface } of EXTENSIONS) {
+  writeFileSync(resolve(FIXTURE_EXTENSIONS, `${name}.json`), JSON.stringify({
+    name,
+    slug: name,
+    description: 'Help compliance fixture',
+    interfaces: {
+      [iface]: {
+        type: iface,
+        specVersion: 'fixture-v1',
+        url: 'https://example.com',
+        versions: [],
+        resourceDescriptions: {},
+        routes: [],
+      },
+    },
+  }));
+}
+afterAll(() => rmSync(FIXTURE_ROOT, { recursive: true, force: true }));
+
+describe('extension compliance fixtures', () => {
+  it('makes every extension target available to the compliance matrix', () => {
+    expect(EXTENSIONS.filter(({ name }) => !extRegistered(name))).toEqual([]);
+  });
+});
 
 // ── --version ──────────────────────────────────────────────
 
@@ -87,11 +111,10 @@ describe.each(BUILTINS)('godmode $name --help', ({ name, args }) => {
 // ── extensions <iface> --help ──────────────────────────────
 
 describe.each(EXTENSIONS)('godmode $name $iface --help', ({ name, iface }) => {
-  const skip = !extRegistered(name);
   let output = '';
-  beforeAll(() => { if (!skip) output = gm(name, iface, '--help'); });
+  beforeAll(() => { output = gm(name, iface, '--help'); });
 
-  (skip ? it.skip : it).each(subHelpRules)('satisfies $id', (rule) => {
+  it.each(subHelpRules)('satisfies $id', (rule) => {
     assertRule(output, rule, `godmode ${name} ${iface} --help`);
   });
 });
@@ -99,11 +122,10 @@ describe.each(EXTENSIONS)('godmode $name $iface --help', ({ name, iface }) => {
 // ── extension overview (godmode <ext> --help) ──────────────
 
 describe.each(EXTENSIONS)('godmode $name --help (overview)', ({ name }) => {
-  const skip = !extRegistered(name);
   let output = '';
-  beforeAll(() => { if (!skip) output = gm(name, '--help'); });
+  beforeAll(() => { output = gm(name, '--help'); });
 
-  (skip ? it.skip : it).each(subHelpRules)('satisfies $id', (rule) => {
+  it.each(subHelpRules)('satisfies $id', (rule) => {
     assertRule(output, rule, `godmode ${name} --help`);
   });
 });

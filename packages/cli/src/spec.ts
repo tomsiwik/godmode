@@ -1,7 +1,3 @@
-import { parseOpenApi } from '@godmode-cli/interface-api';
-import { parseGraphQL } from '@godmode-cli/interface-graphql';
-import { parseMcp } from '@godmode-cli/interface-mcp';
-
 // ── auth & shared ─────────────────────────────────────────────
 
 export interface AuthConfig {
@@ -30,6 +26,7 @@ export interface ManifestSource {
     api?: ApiInterfaceSource;
     graphql?: GraphqlInterfaceSource;
     mcp?: McpInterfaceSource;
+    [name: string]: InterfaceSource | undefined;
   };
   auth?: AuthConfig;
   headers?: Record<string, string>;
@@ -51,7 +48,14 @@ export interface McpInterfaceSource {
   url: string;
 }
 
-export type InterfaceKey = 'api' | 'graphql' | 'mcp';
+export type InterfaceSource =
+  | ApiInterfaceSource
+  | GraphqlInterfaceSource
+  | McpInterfaceSource
+  | Record<string, unknown>;
+
+/** Public interface namespace declared by an extension (for example `api`). */
+export type InterfaceKey = string;
 
 // ── route model (shared by all interfaces) ────────────────────
 
@@ -69,7 +73,7 @@ export interface Route {
   segments: Segment[];
 }
 
-// ── compiled interface data (written to ~/.godmode/apis/<name>.json) ──
+// ── compiled interface data (written to .godmode/extensions/<name>.json) ──
 
 /**
  * Per-interface compiled data. Routes/tools produced by the parser,
@@ -101,7 +105,20 @@ export interface McpInterfaceData extends McpInterfaceSource {
   _mcpTools?: Array<{ name: string; title?: string; description?: string; inputSchema?: unknown }>;
 }
 
-export type InterfaceData = ApiInterfaceData | GraphqlInterfaceData | McpInterfaceData;
+export interface GenericInterfaceData {
+  type: string;
+  specVersion: string;
+  versions: VersionConfig[];
+  resourceDescriptions: Record<string, string>;
+  routes: Route[];
+  [key: string]: unknown;
+}
+
+export type InterfaceData =
+  | ApiInterfaceData
+  | GraphqlInterfaceData
+  | McpInterfaceData
+  | GenericInterfaceData;
 
 /**
  * On-disk extension record. One per extension, holds every declared interface's
@@ -119,6 +136,7 @@ export interface MultiManifest {
     api?: ApiInterfaceData;
     graphql?: GraphqlInterfaceData;
     mcp?: McpInterfaceData;
+    [name: string]: InterfaceData | undefined;
   };
 }
 
@@ -166,6 +184,7 @@ export function projectManifest(multi: MultiManifest, iface: InterfaceKey): Mani
         `(declared: ${Object.keys(multi.interfaces).join(', ')})`,
     );
   }
+  const sourceData = data as GenericInterfaceData;
   const config: ApiConfig = {
     slug: multi.slug,
     name: multi.name,
@@ -173,9 +192,9 @@ export function projectManifest(multi: MultiManifest, iface: InterfaceKey): Mani
     type: iface,
     auth: multi.auth,
     headers: multi.headers,
-    ...('spec' in data ? { spec: data.spec } : {}),
-    ...('url' in data && data.url ? { url: data.url } : {}),
-    ...('prefix' in data && data.prefix ? { prefix: data.prefix } : {}),
+    ...(typeof sourceData.spec === 'string' ? { spec: sourceData.spec } : {}),
+    ...(typeof sourceData.url === 'string' ? { url: sourceData.url } : {}),
+    ...(typeof sourceData.prefix === 'string' ? { prefix: sourceData.prefix } : {}),
     versions: data.versions,
     ...(iface === 'mcp' && (data as McpInterfaceData)._mcpTools
       ? { _mcpTools: (data as McpInterfaceData)._mcpTools }
@@ -190,84 +209,4 @@ export function projectManifest(multi: MultiManifest, iface: InterfaceKey): Mani
     resourceDescriptions: data.resourceDescriptions,
     routes: data.routes,
   };
-}
-
-// ── strategy dispatcher ───────────────────────────────────────
-
-type AnyParser = (name: string, config: ApiConfig) => Promise<Manifest>;
-
-const parsers: Record<InterfaceKey, AnyParser | undefined> = {
-  api: parseOpenApi,
-  graphql: parseGraphQL,
-  mcp: parseMcp,
-};
-
-/**
- * Run the parser for one interface and return its compiled data.
- * Each parser returns a legacy flat Manifest; we convert to InterfaceData.
- */
-export async function compileInterface<K extends InterfaceKey>(
-  iface: K,
-  name: string,
-  source: ManifestSource,
-): Promise<InterfaceData> {
-  const parser = parsers[iface];
-  if (!parser) throw new Error(`Unknown interface '${iface}'`);
-
-  // Construct the legacy ApiConfig the parsers expect.
-  const ifaceSource = source.interfaces[iface];
-  if (!ifaceSource) throw new Error(`Interface '${iface}' not declared on '${name}'`);
-
-  const legacyConfig: ApiConfig = {
-    slug: source.slug || name,
-    name: source.name,
-    description: source.description,
-    type: iface,
-    auth: source.auth,
-    headers: source.headers,
-    ...('spec' in ifaceSource && ifaceSource.spec ? { spec: ifaceSource.spec } : {}),
-    ...('url' in ifaceSource && ifaceSource.url ? { url: ifaceSource.url } : {}),
-    ...('prefix' in ifaceSource && (ifaceSource as ApiInterfaceSource).prefix
-      ? { prefix: (ifaceSource as ApiInterfaceSource).prefix }
-      : {}),
-    versions: (ifaceSource as ApiInterfaceSource).versions,
-  };
-
-  const flat = await parser(name, legacyConfig);
-
-  const base = {
-    type: iface,
-    specVersion: flat.specVersion,
-    versions: flat.versions,
-    resourceDescriptions: flat.resourceDescriptions,
-    routes: flat.routes,
-  };
-
-  if (iface === 'api') {
-    const s = ifaceSource as ApiInterfaceSource;
-    return {
-      ...base,
-      type: 'api',
-      spec: s.spec,
-      url: flat.config.url,
-      prefix: s.prefix,
-    } as ApiInterfaceData;
-  }
-  if (iface === 'graphql') {
-    const s = ifaceSource as GraphqlInterfaceSource;
-    return {
-      ...base,
-      type: 'graphql',
-      spec: s.spec,
-      url: flat.config.url,
-    } as GraphqlInterfaceData;
-  }
-  // mcp
-  const s = ifaceSource as McpInterfaceSource;
-  return {
-    ...base,
-    type: 'mcp',
-    url: s.url,
-    _mcpTools: flat.config._mcpTools,
-  } as McpInterfaceData;
 }

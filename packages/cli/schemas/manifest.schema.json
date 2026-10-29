@@ -23,9 +23,11 @@
     },
     "interfaces": {
       "type": "object",
-      "description": "Map of interface name → interface-specific configuration. At least one required.",
+      "description": "Map of registered interface-provider name → provider-specific configuration. At least one required.",
       "minProperties": 1,
-      "additionalProperties": false,
+      "additionalProperties": {
+        "type": "object"
+      },
       "properties": {
         "api": { "$ref": "#/$defs/ApiInterface" },
         "graphql": { "$ref": "#/$defs/GraphqlInterface" },
