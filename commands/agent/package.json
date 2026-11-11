@@ -1,6 +1,6 @@
 {
   "name": "@godmode-cli/command-agent",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "Agent command — coding agent orchestration for Godmode",
   "type": "module",
