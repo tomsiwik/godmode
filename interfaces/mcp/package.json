@@ -1,6 +1,6 @@
 {
   "name": "@godmode-cli/interface-mcp",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "MCP interface — serve extensions as MCP tools",
   "type": "module",

@@ -1,5 +1,14 @@
 # godmode
 
+## 0.0.4
+
+### Patch Changes
+
+- a038cdd: Fix installation from npm: the bundled workspace packages are no longer published as dependencies, which made `npm install godmode` fail with a 404 since 0.0.2.
+- fae3627: Add a `command` interface: an extension can expose a local program as subcommands with typed arguments, per-command help and permissions, called as `godmode <extension> <command> [args]`.
+- 78fe813: Help tables cap the name column for command extensions: a name wider than the column stands on its own line and its description starts below it, so one long command no longer narrows every description.
+- d1e2995: Replace the fixed interface set with a provider registry for help, compilation, and runtime dispatch.
+
 ## 0.0.3
 
 ### Patch Changes

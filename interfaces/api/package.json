@@ -1,6 +1,6 @@
 {
   "name": "@godmode-cli/interface-api",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "private": true,
   "description": "REST interface — HTTP execution for OpenAPI",
   "type": "module",
