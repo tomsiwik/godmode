@@ -4,7 +4,6 @@ import {
   config,
 } from './config.js';
 import { projectManifest, type InterfaceKey, type MultiManifest } from './spec.js';
-import { parseArgs } from './args.js';
 import { showHelp, showExtensionOverview, showExtensionVersion, showVersion } from './help.js';
 import { interfaceRegistry } from './interface-registry.js';
 import { EXIT_CODES } from './exit-codes.js';
@@ -16,12 +15,13 @@ loadEnv();
 // ── grammar ──────────────────────────────────────────────────
 //
 //   godmode <built-in> <command> [args]        — core extension (ext, agent, ...)
-//   godmode <extension> <interface> [args]     — user-installed: interface REQUIRED
+//   godmode <extension> <command> [args]       — extension declaring `command`
+//   godmode <extension> <interface> [args]     — any other interface: REQUIRED
 //
-// No inference. The extension's manifest declares which interfaces exist;
-// the user picks one explicitly each time. Nested help drills at every
-// level: `godmode stripe --help` → extension overview,
-// `godmode stripe api --help` → interface help, etc.
+// The extension's manifest declares which interfaces exist. Only `command`
+// is implicit, as it is for built-ins; every other interface is named.
+// Nested help drills at every level: `godmode stripe --help` → extension
+// overview, `godmode stripe api --help` → interface help, etc.
 
 async function main() {
   const args = process.argv.slice(2);
@@ -71,7 +71,14 @@ async function main() {
     return;
   }
 
-  // Interface is mandatory. First token MUST be a declared interface.
+  // A command-backed extension reads like a program: unless the first token
+  // names one of its other interfaces, it is one of its commands.
+  if (declared.includes('command') && !declared.includes(first as InterfaceKey)) {
+    await runInterface('command', extensionSlug, rest, multi);
+    return;
+  }
+
+  // Otherwise the interface is mandatory and must be one the extension declares.
   if (!interfaceRegistry.has(first)) {
     process.stderr.write(`Missing interface.\n`);
     process.stderr.write(`'${extensionSlug}' declares: ${declared.join(', ')}.\n`);
@@ -109,7 +116,7 @@ async function runInterface(
   }
 
   const ifaceKey = iface as InterfaceKey;
-  const parsed = parseArgs(rest);
+  const parsed = interfaceRegistry.parse(ifaceKey, rest);
   const manifest = projectManifest(multi, ifaceKey);
 
   const handler = interfaceRegistry.create({

@@ -201,6 +201,16 @@ function absolutizeSource(source: ManifestSource, dir: string): ManifestSource {
       config.spec = resolve(dir, spec);
     }
   }
+  const command = next.interfaces.command as { run?: unknown; spec?: unknown } | undefined;
+  if (command) {
+    // A program or spec written as ./path belongs to the extension, not to the caller's cwd.
+    const local = (part: unknown) =>
+      typeof part === 'string' && /^\.\.?\//.test(part) ? resolve(dir, part) : part;
+    command.run = Array.isArray(command.run) ? command.run.map(local) : local(command.run);
+    if (typeof command.spec === 'string' && !isAbsolute(command.spec)) {
+      command.spec = resolve(dir, command.spec);
+    }
+  }
   return next;
 }
 

@@ -17,7 +17,15 @@ import {
   type Footer,
   type HelpPageData,
 } from '@godmode-cli/cli';
-import type { InterfaceKey, Manifest, MultiManifest, Route } from './spec.js';
+import type {
+  CommandArg,
+  CommandInterfaceData,
+  CommandSpec,
+  InterfaceKey,
+  Manifest,
+  MultiManifest,
+  Route,
+} from './spec.js';
 import { BUILTINS } from './builtins.js';
 import { interfaceRegistry } from './interface-registry.js';
 
@@ -216,23 +224,143 @@ export class ExtHelp extends HelpPage {
 export class ExtensionOverview extends HelpPage {
   constructor(protected multi: MultiManifest) { super(); }
   title() { return titleCase(this.multi.name || this.multi.slug); }
+  tagline() {
+    return this.multi.interfaces.command && this.multi.description
+      ? paragraphs(this.multi.description)
+      : null;
+  }
   usage() {
     const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
-    return declared.map(
-      (iface) => `godmode ${this.multi.slug} ${iface}${interfaceRegistry.usage(iface)}`,
-    );
+    return declared.map((iface) => usageOf(this.multi.slug, iface));
   }
   sections() {
     const declared = Object.keys(this.multi.interfaces) as InterfaceKey[];
+    const commands = this.multi.interfaces.command as CommandInterfaceData | undefined;
+    const interfaces = { title: 'Interfaces:', rows: declared.map((iface) => {
+      const d = this.multi.interfaces[iface];
+      const url = d && 'url' in d && d.url ? d.url : '(local)';
+      return [iface, url];
+    }) as string[][] };
     return [
-      { title: 'Interfaces:', rows: declared.map((iface) => {
-        const d = this.multi.interfaces[iface];
-        const url = d && 'url' in d && d.url ? d.url : '(local)';
-        return [iface, url];
-      }) as string[][] },
-      { title: 'Options:', rows: [['-v, --version', 'show extension spec versions']] as string[][] },
+      // A command-only extension reads like a program: its commands are the page.
+      ...(commands && declared.length === 1 ? [] : [interfaces]),
+      ...(commands ? commandSections(commands) : []),
+      { title: 'Options:', rows: [
+        ...(commands ? [['-h, --help', 'show help for the extension or one command']] : []),
+        ['-v, --version', 'show extension spec versions'],
+      ] as string[][] },
     ];
   }
+  footer(): Footer | null {
+    return this.multi.interfaces.command
+      ? { extras: [`Run "godmode ${this.multi.slug} <command> --help" for a command's arguments.`] }
+      : null;
+  }
+}
+
+/** The command interface is implicit: `godmode <ext> <command>`. */
+function usageOf(slug: string, iface: InterfaceKey): string {
+  return iface === 'command'
+    ? `godmode ${slug}${interfaceRegistry.usage(iface)}`
+    : `godmode ${slug} ${iface}${interfaceRegistry.usage(iface)}`;
+}
+
+/** Wraps prose to the help width, keeping blank lines between paragraphs. */
+function paragraphs(text: string, width = 78): string {
+  return text
+    .trim()
+    .split(/\n\s*\n/)
+    .map((paragraph) => wrapText(paragraph.replace(/\s+/g, ' ').trim(), width).join('\n'))
+    .join('\n\n');
+}
+
+function commandSections(data: CommandInterfaceData): HelpSection[] {
+  const groups = new Map<string, CommandSpec[]>();
+  for (const command of data.commands) {
+    const group = command.group || 'Commands';
+    groups.set(group, [...(groups.get(group) ?? []), command]);
+  }
+  return [...groups].map(([group, commands]) => ({
+    title: `${group}:`,
+    rows: commands.map((command) => [command.name, command.summary || '']),
+  }));
+}
+
+/** `godmode <ext> command --help`: every command of the extension. */
+export class CommandListHelp extends ExtensionOverview {
+  sections() {
+    const commands = this.multi.interfaces.command as CommandInterfaceData;
+    return [
+      ...commandSections(commands),
+      { title: 'Options:', rows: [
+        ['-h, --help', 'show help for the extension or one command'],
+        ['-v, --version', 'show extension spec versions'],
+      ] as string[][] },
+    ];
+  }
+}
+
+/** `godmode <ext> <command> --help`: what one command does and takes. */
+export class CommandHelp extends HelpPage {
+  constructor(protected multi: MultiManifest, protected command: CommandSpec) { super(); }
+
+  private get args(): CommandArg[] { return this.command.args ?? []; }
+
+  tagline() {
+    const { summary, description } = this.command;
+    return [summary, description && paragraphs(description)].filter(Boolean).join('\n\n') || null;
+  }
+
+  usage() {
+    const positional = this.args
+      .filter((arg) => arg.positional)
+      .map((arg) => {
+        const name = `<${arg.name}>${arg.repeatable ? '...' : ''}`;
+        return arg.required ? name : `[${name}]`;
+      });
+    const named = this.args.some((arg) => !arg.positional) || this.command.passthrough;
+    return [
+      ['godmode', this.multi.slug, this.command.name, ...positional, named ? '[args]' : '']
+        .filter(Boolean)
+        .join(' '),
+    ];
+  }
+
+  sections() {
+    const rows = this.args.map((arg) => [argumentLabel(arg), argumentNote(arg)]);
+    return [
+      ...(rows.length ? [{ title: 'Arguments:', rows }] : []),
+      { title: 'Options:', rows: [['-h, --help', 'show help for this command']] },
+      ...(this.command.examples?.length
+        ? [{ title: 'Examples:', rows: this.command.examples.map((example) => [example, '']) }]
+        : []),
+    ];
+  }
+
+  footer(): Footer | null {
+    if (this.command.passthrough) {
+      return { extras: ['Every argument is handed to the program unchanged.'] };
+    }
+    return this.args.some((arg) => !arg.positional)
+      ? { extras: ['Write an argument as name=value or --name value.'] }
+      : null;
+  }
+}
+
+function argumentLabel(arg: CommandArg): string {
+  if (arg.positional) return `<${arg.name}>`;
+  if (arg.type === 'boolean') return `${arg.name}=true`;
+  const value = arg.choices?.length ? arg.choices.join('|') : arg.type === 'number' ? 'number' : 'value';
+  return `${arg.name}=<${value}>`;
+}
+
+function argumentNote(arg: CommandArg): string {
+  const notes = [
+    arg.required ? 'required' : '',
+    arg.repeatable ? 'repeatable' : '',
+    arg.default !== undefined ? `default ${arg.default}` : '',
+  ].filter(Boolean);
+  return [arg.description || '', notes.length ? `(${notes.join(', ')})` : ''].filter(Boolean).join(' ');
 }
 
 export class ExtensionVersionPage extends HelpPage {
@@ -305,9 +433,7 @@ export class InterfaceHelp extends HelpPage {
         ? (Object.keys(multi.interfaces) as InterfaceKey[])
         : [this.ifaceType];
       const ordered = [this.ifaceType, ...declared.filter((k) => k !== this.ifaceType)];
-      return ordered.map(
-        (iface) => `godmode ${this.apiName} ${iface}${interfaceRegistry.usage(iface)}`,
-      );
+      return ordered.map((iface) => usageOf(this.apiName, iface));
     }
     const nav = this.getNav();
     if (!nav) return [];
@@ -404,6 +530,10 @@ export function showHelp() { new RootHelp().render(); }
 export function showExtHelp() { new ExtHelp().render(); }
 export function showExtensionOverview(multi: MultiManifest) { new ExtensionOverview(multi).render(); }
 export function showExtensionVersion(multi: MultiManifest) { new ExtensionVersionPage(multi).render(); }
+export function showCommandList(multi: MultiManifest) { new CommandListHelp(multi).render(); }
+export function showCommandHelp(multi: MultiManifest, command: CommandSpec) {
+  new CommandHelp(multi, command).render();
+}
 export function showApiHelp(
   manifest: Manifest,
   apiName: string,

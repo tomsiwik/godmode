@@ -17,6 +17,14 @@ export interface ParsedArgs {
 
 const HTTP_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD']);
 
+/** Debug and dry-run come from the environment; they are not user-facing flags. */
+export function runtimeFlags(): Pick<ParsedArgs, 'debug' | 'dryRun'> {
+  return {
+    debug: process.env.GODMODE_DEBUG === '1',
+    dryRun: process.env.GODMODE_DRY_RUN === '1',
+  };
+}
+
 export function parseArgs(args: string[]): ParsedArgs {
   const segments: string[] = [];
   const headers: Record<string, string> = {};
@@ -27,8 +35,7 @@ export function parseArgs(args: string[]): ParsedArgs {
   let filter: string | undefined;
   let methodFilter: string | undefined;
   let all = false;
-  const debug = process.env.GODMODE_DEBUG === '1';
-  const dryRun = process.env.GODMODE_DRY_RUN === '1';
+  const { debug, dryRun } = runtimeFlags();
   let help = false;
 
   for (let i = 0; i < args.length; i++) {

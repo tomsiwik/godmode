@@ -24,6 +24,7 @@ godmode <extension> <interface> [args...]
 
 - `<extension>` — anything installed via `godmode ext install`, plus the built-ins `ext` and `agent`.
 - `<interface>` — `api`, `graphql`, or `mcp`.
+- An extension that wraps a local program declares a `command` interface, which is implicit: `godmode <extension> <command> [name=value...]`. `godmode <extension> --help` lists its commands and `godmode <extension> <command> --help` shows one command's arguments and examples.
 - `[args...]` — interface-specific. For `api`, follows [httpie](https://httpie.io/docs/cli/request-items) conventions: `key=value` → JSON body, `key==value` → query, `-H 'X:y'` → header.
 
 ## The three commands you'll use 95% of the time

@@ -32,6 +32,8 @@ export interface InterfaceClass {
   readonly key: string;
   readonly usage: string;
   compile(name: string, source: ManifestSource): Promise<InterfaceData>;
+  /** Replaces the shared request-style argument parser for this interface. */
+  parseArgs?(args: string[]): ParsedArgs;
   new (ctx: InterfaceContext): InterfaceHandler;
 }
 
