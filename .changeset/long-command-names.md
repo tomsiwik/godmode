@@ -1,0 +1,6 @@
+---
+"godmode": patch
+"@godmode-cli/cli": patch
+---
+
+Help tables cap the name column for command extensions: a name wider than the column stands on its own line and its description starts below it, so one long command no longer narrows every description.
