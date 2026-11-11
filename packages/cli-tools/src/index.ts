@@ -49,7 +49,12 @@ export interface HelpSection {
  *     is at the same column (global max).
  *   - The description column auto-wraps to respect maxLineWidth.
  */
-export function renderSections(sections: HelpSection[], maxLineWidth = 80) {
+export function renderSections(
+  sections: HelpSection[],
+  maxLineWidth = 80,
+  /** Widest left column before a row's description moves to the next line. */
+  maxLeft = Number.POSITIVE_INFINITY,
+) {
   const INDENT = '  ';
   const GAP = '  ';
 
@@ -78,7 +83,7 @@ export function renderSections(sections: HelpSection[], maxLineWidth = 80) {
   if (!allRows.length) return;
   const rowsWithDesc = allRows.filter((r) => r[1].length > 0);
   const widthCandidates = (rowsWithDesc.length ? rowsWithDesc : allRows).map((r) => visibleLength(r[0]));
-  const globalLeft = Math.max(...widthCandidates);
+  const globalLeft = Math.min(Math.max(...widthCandidates), maxLeft);
   const descBudget = Math.max(20, maxLineWidth - INDENT.length - globalLeft - GAP.length);
 
   for (const s of flattened) {
@@ -94,15 +99,17 @@ export function renderSections(sections: HelpSection[], maxLineWidth = 80) {
         console.log(`${INDENT}${left}${pad}`.trimEnd());
         continue;
       }
-      if (plain.length <= descBudget) {
+      if (plain.length <= descBudget && visibleLength(left) <= globalLeft) {
         console.log(`${INDENT}${left}${pad}${GAP}${desc}`);
         continue;
       }
       const italic = /^\x1b\[3m/.test(desc);
       const wrap = (s: string) => (italic ? `${ITALIC}${s}${RESET}` : s);
       const lines = wrapText(plain, Math.max(10, descBudget));
-      console.log(`${INDENT}${left}${pad}${GAP}${wrap(lines[0])}`);
-      for (let i = 1; i < lines.length; i++) {
+      // A name wider than the column stands alone; its description starts below it.
+      const alone = visibleLength(left) > globalLeft;
+      console.log(alone ? `${INDENT}${left}` : `${INDENT}${left}${pad}${GAP}${wrap(lines[0])}`);
+      for (let i = alone ? 0 : 1; i < lines.length; i++) {
         console.log(`${INDENT}${' '.repeat(Math.max(0, globalLeft))}${GAP}${wrap(lines[i])}`);
       }
     }
@@ -161,6 +168,8 @@ export abstract class HelpPage {
   usage(): string[] { return []; }
   sections(): HelpSection[] { return []; }
   footer(): Footer | null { return null; }
+  /** Widest left column; longer names put their description on the next line. */
+  leftLimit(): number | undefined { return undefined; }
 
   toJSON(): HelpPageData {
     return {
@@ -198,7 +207,7 @@ export abstract class HelpPage {
       }
       wrote = true;
     }
-    renderSections(d.sections);
+    renderSections(d.sections, undefined, this.leftLimit());
     if (d.footer) {
       if (d.footer.extras?.length) {
         console.log('');

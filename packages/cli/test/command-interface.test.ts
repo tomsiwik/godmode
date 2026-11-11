@@ -240,6 +240,20 @@ describe('command interface help', () => {
     expect(gmIn(root, 'tool', 'copy', '--help')).toContain('Usage: godmode tool copy <from> [<to>...] [args]');
   });
 
+  it('puts the summary of a long command name on the next line, in the same column', async () => {
+    const long = 'replace-nested-conditional-with-guard-clauses';
+    const manifest = [
+      'name: Tool', 'slug: tool', 'interfaces:', '  command:', '    run: node', '    commands:',
+      '      - name: fold', '        summary: Fold two things into one when both are known to be the same',
+      `      - name: ${long}`, '        summary: Replace nesting with early returns',
+    ].join('\n');
+    const { root } = await project(manifest);
+    const help = gmIn(root, 'tool', '--help');
+    expect(help).toContain('  fold                          Fold two things into one when both are known to\n');
+    expect(help).toContain(`  ${long}\n                                Replace nesting with early returns`);
+    expect(subHelpRules.map((rule) => rule.check(help)).filter((result) => !result.ok)).toEqual([]);
+  });
+
   it.each([[['tool', '--help']], [['tool', 'greet', '--help']], [['tool', 'copy', '--help']], [['tool', 'raw', '--help']]])(
     'keeps %j within the help format rules',
     async (args) => {

@@ -256,7 +256,11 @@ export class ExtensionOverview extends HelpPage {
       ? { extras: [`Run "godmode ${this.multi.slug} <command> --help" for a command's arguments.`] }
       : null;
   }
+  // One long command name must not squeeze every other description.
+  leftLimit() { return this.multi.interfaces.command ? COMMAND_COLUMN : undefined; }
 }
+
+const COMMAND_COLUMN = 28;
 
 /** The command interface is implicit: `godmode <ext> <command>`. */
 function usageOf(slug: string, iface: InterfaceKey): string {
@@ -336,6 +340,8 @@ export class CommandHelp extends HelpPage {
         : []),
     ];
   }
+
+  leftLimit() { return COMMAND_COLUMN; }
 
   footer(): Footer | null {
     if (this.command.passthrough) {
