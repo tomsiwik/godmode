@@ -1,6 +1,12 @@
 # 0200 — Extension authoring & scaffolding
 
-**Status:** Finished · **Level:** Epic · **Depends on:** 0100
+**Status:** In progress · **Level:** Epic · **Depends on:** 0100
+
+**Landed:** the `command` archetype, as a declarative interface with typed arguments,
+per-command help and permissions (`packages/cli/src/interfaces/command.ts`,
+`apps/docs/content/docs/commands.mdx`). **Open:** `orchestrator`, `mcp-package`,
+`extension create|validate|test|publish`, generated `SKILL.md`, and approval of
+agent-created extensions.
 
 ## Summary
 

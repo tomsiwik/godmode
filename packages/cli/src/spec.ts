@@ -26,6 +26,7 @@ export interface ManifestSource {
     api?: ApiInterfaceSource;
     graphql?: GraphqlInterfaceSource;
     mcp?: McpInterfaceSource;
+    command?: CommandInterfaceSource;
     [name: string]: InterfaceSource | undefined;
   };
   auth?: AuthConfig;
@@ -48,10 +49,53 @@ export interface McpInterfaceSource {
   url: string;
 }
 
+/** One argument of a command. Named arguments are written `name=value` or
+ *  `--name value`; positional ones are given in declaration order. */
+export interface CommandArg {
+  name: string;
+  description?: string;
+  type?: 'string' | 'boolean' | 'number';
+  required?: boolean;
+  /** Passed to the program by position instead of as a flag. */
+  positional?: boolean;
+  /** May be given more than once (the last positional may be variadic). */
+  repeatable?: boolean;
+  choices?: string[];
+  /** Documented default; the program applies it. */
+  default?: string;
+  /** Flag handed to the program. Defaults to `--<name>`. */
+  flag?: string;
+}
+
+/** A subcommand of a command-backed extension. */
+export interface CommandSpec {
+  name: string;
+  summary?: string;
+  description?: string;
+  /** Heading the command is listed under in help. */
+  group?: string;
+  /** Leading arguments handed to the program. Defaults to `[name]`. */
+  argv?: string[];
+  args?: CommandArg[];
+  /** Hand every argument to the program untouched, without validation. */
+  passthrough?: boolean;
+  examples?: string[];
+}
+
+/** A local program exposed as subcommands. */
+export interface CommandInterfaceSource {
+  /** The program, or the program followed by fixed leading arguments. */
+  run: string | string[];
+  /** JSON or YAML file holding `{ version?, commands }`. */
+  spec?: string;
+  commands?: CommandSpec[];
+}
+
 export type InterfaceSource =
   | ApiInterfaceSource
   | GraphqlInterfaceSource
   | McpInterfaceSource
+  | CommandInterfaceSource
   | Record<string, unknown>;
 
 /** Public interface namespace declared by an extension (for example `api`). */
@@ -105,6 +149,16 @@ export interface McpInterfaceData extends McpInterfaceSource {
   _mcpTools?: Array<{ name: string; title?: string; description?: string; inputSchema?: unknown }>;
 }
 
+export interface CommandInterfaceData {
+  type: 'command';
+  specVersion: string;
+  versions: VersionConfig[];
+  resourceDescriptions: Record<string, string>;
+  routes: Route[];
+  run: string[];
+  commands: CommandSpec[];
+}
+
 export interface GenericInterfaceData {
   type: string;
   specVersion: string;
@@ -118,6 +172,7 @@ export type InterfaceData =
   | ApiInterfaceData
   | GraphqlInterfaceData
   | McpInterfaceData
+  | CommandInterfaceData
   | GenericInterfaceData;
 
 /**
@@ -136,6 +191,7 @@ export interface MultiManifest {
     api?: ApiInterfaceData;
     graphql?: GraphqlInterfaceData;
     mcp?: McpInterfaceData;
+    command?: CommandInterfaceData;
     [name: string]: InterfaceData | undefined;
   };
 }

@@ -50,7 +50,7 @@ describe('interface class registry', () => {
   });
 
   it('registers built-in compilers and handlers through the same named seam', () => {
-    expect(interfaceRegistry.names()).toEqual(['api', 'graphql', 'mcp']);
+    expect(interfaceRegistry.names()).toEqual(['api', 'command', 'graphql', 'mcp']);
   });
 
   it('uses one extension-defined class for compilation and runtime dispatch', async () => {

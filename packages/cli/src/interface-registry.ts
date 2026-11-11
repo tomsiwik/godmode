@@ -1,3 +1,4 @@
+import { parseArgs, type ParsedArgs } from './args.js';
 import type {
   InterfaceClass,
   InterfaceContext,
@@ -25,6 +26,11 @@ export class InterfaceRegistry {
   get(key: string): InterfaceClass | undefined { return this.classes.get(key); }
   names(): string[] { return [...this.classes.keys()].sort(); }
   usage(key: string): string { return this.classes.get(key)?.usage || ' <command> [args]'; }
+
+  /** Parses an interface's arguments with its own parser when it has one. */
+  parse(key: string, args: string[]): ParsedArgs {
+    return this.classes.get(key)?.parseArgs?.(args) ?? parseArgs(args);
+  }
 
   create(ctx: InterfaceContext): InterfaceHandler {
     const InterfaceType = this.classes.get(ctx.iface);

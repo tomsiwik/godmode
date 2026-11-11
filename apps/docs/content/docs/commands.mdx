@@ -1,0 +1,132 @@
+---
+title: Command extensions
+description: Expose a local program as godmode subcommands with typed arguments, help and permissions.
+---
+
+A command extension wraps a program on your machine. Its manifest lists the
+commands and their arguments, so godmode can document, validate and gate each
+call before the program starts.
+
+## Manifest
+
+```yaml
+name: Notes
+slug: notes
+description: Read and write the team's notes.
+interfaces:
+  command:
+    run: [node, ./bin/notes.mjs]
+    commands:
+      - name: add
+        summary: Add a note
+        group: Writing
+        args:
+          - name: title
+            description: one-line title
+            required: true
+          - name: tag
+            repeatable: true
+          - name: pinned
+            type: boolean
+        examples:
+          - godmode notes add title="Ship it" tag=release
+      - name: show
+        summary: Print a note
+        group: Reading
+        args:
+          - name: id
+            positional: true
+            required: true
+```
+
+`run` is the program, or the program followed by fixed leading arguments. A
+part written as `./path` is resolved against the manifest's folder; anything
+else is looked up on `PATH`.
+
+## Calling a command
+
+The command interface is implicit, as it is for built-ins:
+
+```sh
+godmode notes add title="Ship it" tag=release pinned=true
+godmode notes show 42
+godmode notes --help          # every command, by group
+godmode notes add --help      # arguments, defaults and examples
+```
+
+An argument is written `name=value` or `--name value`. godmode runs the program
+with the command name followed by positional values and then one flag per
+argument, in the order you gave them:
+
+```sh
+node ./bin/notes.mjs add --title "Ship it" --tag release --pinned
+```
+
+The program inherits stdin, stdout and stderr, and its exit status becomes
+godmode's. It also receives `GODMODE_EXTENSION` and `GODMODE_COMMAND`.
+
+## Arguments
+
+| Field | Meaning |
+|---|---|
+| `name` | Argument name, also the default flag (`--name`) |
+| `description` | Shown in the command's help |
+| `type` | `string` (default), `boolean` or `number` |
+| `required` | The call is refused without it |
+| `positional` | Passed by position, in declaration order |
+| `repeatable` | May be given more than once; the last positional may be variadic |
+| `choices` | The only accepted values |
+| `default` | Documented default; the program applies it |
+| `flag` | Flag handed to the program when it is not `--name` |
+
+A call with an unknown argument, a missing required one, or a value of the
+wrong type exits with status 2 and never reaches the program.
+
+## Commands
+
+| Field | Meaning |
+|---|---|
+| `name` | Lowercase letters, numbers and hyphens |
+| `summary` | One line for the command list |
+| `description` | Paragraphs for the command's own help |
+| `group` | Heading the command is listed under |
+| `argv` | Leading arguments for the program when they differ from `[name]` |
+| `passthrough` | Hand every argument to the program unchanged, without validation |
+| `examples` | Lines shown under Examples |
+
+## Generated specs
+
+A long command list can live in its own JSON or YAML file:
+
+```yaml
+interfaces:
+  command:
+    run: my-tool
+    spec: ./commands.json   # { "version": "1.4.0", "commands": [...] }
+```
+
+`godmode ext install` reads the file once and stores the result, so reinstall
+the extension after regenerating it. Commands listed in the manifest are added
+after the ones from the file.
+
+## Permissions
+
+Each command is a resource with the method `COMMAND`:
+
+```yaml
+extensions:
+  notes:
+    permissions:
+      allow:
+        - resources: ["*"]
+      deny:
+        - resources: [add]
+```
+
+See [Permissions](/docs/permissions) for how rules are evaluated.
+
+## Trust
+
+Installing a command extension lets godmode start that program with your
+privileges whenever one of its commands is called. Install only manifests you
+have read.
