@@ -46,11 +46,6 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@godmode-cli/cli": "workspace:*",
-    "@godmode-cli/command-agent": "workspace:*",
-    "@godmode-cli/interface-api": "workspace:*",
-    "@godmode-cli/interface-graphql": "workspace:*",
-    "@godmode-cli/interface-mcp": "workspace:*",
     "@hey-api/openapi-ts": "^0.97.0",
     "@modelcontextprotocol/sdk": "^1.29.0",
     "fuzzysort": "^3.1.0",
@@ -58,6 +53,11 @@
     "yaml": "^2.8.4"
   },
   "devDependencies": {
+    "@godmode-cli/cli": "workspace:*",
+    "@godmode-cli/command-agent": "workspace:*",
+    "@godmode-cli/interface-api": "workspace:*",
+    "@godmode-cli/interface-graphql": "workspace:*",
+    "@godmode-cli/interface-mcp": "workspace:*",
     "@types/node": "^25.6.0",
     "@types/prompts": "^2.4.9",
     "tsup": "^8.5.1",
