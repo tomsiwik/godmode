@@ -1,19 +1,24 @@
-'use client';
-import type { ComponentProps } from 'react';
-import { Search } from 'lucide-react';
-import { useSearchContext } from 'fumadocs-ui/contexts/search';
-import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { cn } from '../../lib/cn';
-import { type ButtonProps, buttonVariants } from '@godmode-cli/ui';
+import { getItemKey } from "../../lib/item-key";
 
-interface SearchToggleProps extends Omit<ComponentProps<'button'>, 'color'>, ButtonProps {
+("use client");
+
+import { useTranslations } from "@fuma-translate/react";
+import { type ButtonProps, buttonVariants } from "@godmode-cli/ui";
+import { useSearchContext } from "fumadocs-ui/contexts/search";
+import { Search } from "lucide-react";
+import type { ComponentProps } from "react";
+import { cn } from "../../lib/cn";
+
+interface SearchToggleProps
+  extends Omit<ComponentProps<"button">, "color">,
+    ButtonProps {
   hideIfDisabled?: boolean;
 }
 
 export function SearchToggle({
   hideIfDisabled,
-  size = 'icon-sm',
-  color = 'ghost',
+  size = "icon-sm",
+  color = "ghost",
   ...props
 }: SearchToggleProps) {
   const { setOpenSearch, enabled } = useSearchContext();
@@ -43,11 +48,11 @@ export function SearchToggle({
 export function LargeSearchToggle({
   hideIfDisabled,
   ...props
-}: ComponentProps<'button'> & {
+}: ComponentProps<"button"> & {
   hideIfDisabled?: boolean;
 }) {
   const { enabled, hotKey, setOpenSearch } = useSearchContext();
-  const { text } = useI18n();
+  const t = useTranslations();
   if (hideIfDisabled && !enabled) return null;
 
   return (
@@ -56,7 +61,7 @@ export function LargeSearchToggle({
       data-search-full=""
       {...props}
       className={cn(
-        'inline-flex items-center gap-2 rounded-md border bg-fd-secondary/50 p-2 ps-2.5 text-sm text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground',
+        "inline-flex items-center gap-2 rounded-md border bg-fd-secondary/50 p-2 ps-2.5 text-sm text-fd-muted-foreground transition-colors hover:bg-fd-accent hover:text-fd-accent-foreground",
         props.className,
       )}
       onClick={() => {
@@ -64,10 +69,13 @@ export function LargeSearchToggle({
       }}
     >
       <Search className="size-4" />
-      {text.search}
+      {t("Search")}
       <div className="ms-auto inline-flex gap-0.5">
-        {hotKey.map((k, i) => (
-          <kbd key={i} className="rounded-sm border bg-fd-background px-1.5">
+        {hotKey.map((k) => (
+          <kbd
+            key={getItemKey(k)}
+            className="rounded-sm border bg-fd-background px-1.5"
+          >
             {k.display}
           </kbd>
         ))}

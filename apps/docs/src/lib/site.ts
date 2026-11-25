@@ -14,14 +14,14 @@
 //
 // https://vercel.com/docs/environment-variables/system-environment-variables
 export const SITE_URL =
-  process.env.SITE_URL?.replace(/\/$/, '') ??
+  process.env.SITE_URL?.replace(/\/$/, "") ??
   (process.env.VERCEL_PROJECT_PRODUCTION_URL
-    ? 'https://' + process.env.VERCEL_PROJECT_PRODUCTION_URL
-    : 'https://godmode.so');
+    ? `https://${process.env.VERCEL_PROJECT_PRODUCTION_URL}`
+    : "https://godmode.so");
 
 export function getPageImage(slugs: string[]) {
-  const segments = [...slugs, 'image.webp'];
-  const path = '/og/' + segments.join('/');
+  const segments = [...slugs, "image.webp"];
+  const path = `/og/${segments.join("/")}`;
   return {
     segments,
     // Social crawlers need absolute URLs; relative paths are ignored.

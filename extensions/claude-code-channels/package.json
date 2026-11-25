@@ -30,7 +30,7 @@
     "build": "tsup src/channels.ts --format esm --clean"
   },
   "dependencies": {
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "croner": "^10.0.1"
   },
   "devDependencies": {

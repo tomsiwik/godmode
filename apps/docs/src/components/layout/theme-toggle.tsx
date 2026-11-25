@@ -1,9 +1,9 @@
-'use client';
-import { Monitor, Moon, Sun } from 'lucide-react';
-import { useTheme } from 'next-themes';
-import { type ComponentProps, useEffect, useState } from 'react';
-import { buttonVariants } from '@godmode-cli/ui';
-import { cn } from '../../lib/cn';
+"use client";
+import { buttonVariants } from "@godmode-cli/ui";
+import { Monitor, Moon, Sun } from "lucide-react";
+import { useTheme } from "next-themes";
+import { type ComponentProps, useEffect, useState } from "react";
+import { cn } from "../../lib/cn";
 
 /**
  * Single-icon theme toggle that visually pairs with the GitHub icon link.
@@ -16,23 +16,24 @@ import { cn } from '../../lib/cn';
  *   half size centered inside it — the monitor "displays" the current OS
  *   theme, signalling "OS controls this".
  */
-export function ThemeToggle({ className, ...props }: ComponentProps<'button'>) {
+export function ThemeToggle({ className, ...props }: ComponentProps<"button">) {
   const { setTheme, theme, resolvedTheme } = useTheme();
   const [mounted, setMounted] = useState(false);
   useEffect(() => setMounted(true), []);
 
-  const isSystem = mounted && theme === 'system';
-  const effective = mounted ? resolvedTheme : 'light';
-  const Resolved = effective === 'dark' ? Moon : Sun;
+  const isSystem = mounted && theme === "system";
+  const effective = mounted ? resolvedTheme : "light";
+  const Resolved = effective === "dark" ? Moon : Sun;
 
-  const next = theme === 'light' ? 'dark' : theme === 'dark' ? 'system' : 'light';
+  const next =
+    theme === "light" ? "dark" : theme === "dark" ? "system" : "light";
 
   // Title: full plain-language explanation on hover/focus
   const currentLabel = !mounted
-    ? 'system'
-    : theme === 'system'
+    ? "system"
+    : theme === "system"
       ? `system (currently ${effective})`
-      : (theme ?? 'system');
+      : (theme ?? "system");
   const title = `Theme: ${currentLabel} — click to switch to ${next}`;
 
   return (
@@ -42,14 +43,17 @@ export function ThemeToggle({ className, ...props }: ComponentProps<'button'>) {
       aria-label={title}
       onClick={() => setTheme(next)}
       className={cn(
-        buttonVariants({ size: 'icon-sm', color: 'ghost' }),
-        'relative text-fd-muted-foreground',
+        buttonVariants({ size: "icon-sm", color: "ghost" }),
+        "relative text-fd-muted-foreground",
         className,
       )}
       {...props}
     >
       {isSystem ? (
-        <span aria-hidden className="relative inline-flex items-center justify-center">
+        <span
+          aria-hidden
+          className="relative inline-flex items-center justify-center"
+        >
           <Monitor className="size-4" />
           <Resolved
             // Resolved theme nested inside the monitor frame at half size.

@@ -1,43 +1,44 @@
-import { createFileRoute } from '@tanstack/react-router';
-import { ElectricLogo } from '@godmode-cli/ui';
-import { useState } from 'react';
-import { LandingHeader } from '@/components/layout/landing-header';
-import { InstallCommand } from '@/components/install-command';
-import { SITE_URL } from '@/lib/site';
+import { ElectricLogo } from "@godmode-cli/ui";
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { InstallCommand } from "@/components/install-command";
+import { LandingHeader } from "@/components/layout/landing-header";
+import { SITE_URL } from "@/lib/site";
 
-const TITLE = 'Godmode — the swiss army knife for coding agents';
-const DESCRIPTION = 'One predictable CLI for every API, MCP server, and local command you install.';
+const TITLE = "Godmode — the swiss army knife for coding agents";
+const DESCRIPTION =
+  "One predictable CLI for every API, MCP server, and local command you install.";
 const OG_IMAGE = `${SITE_URL}/og/landing.webp`;
 const LOGO_CONTROLS = [
-  { key: 'scale', label: 'Scale', min: 0.1, max: 0.8, step: 0.01 },
-  { key: 'intensity', label: 'Intensity', min: 0.1, max: 3, step: 0.1 },
-  { key: 'glow', label: 'Glow', min: 0, max: 3, step: 0.1 },
-  { key: 'thickness', label: 'Thickness', min: 0.5, max: 4, step: 0.1 },
-  { key: 'strands', label: 'Strands', min: 1, max: 6, step: 1 },
-  { key: 'bend', label: 'Bend', min: 0, max: 2, step: 0.1 },
-  { key: 'crackle', label: 'Crackle', min: 0, max: 3, step: 0.1 },
-  { key: 'flicker', label: 'Flicker', min: 0, max: 1, step: 0.05 },
-  { key: 'fill', label: 'Fill', min: 0, max: 1, step: 0.05 },
-  { key: 'speed', label: 'Speed', min: 0.1, max: 4, step: 0.1 },
-  { key: 'arcs', label: 'Strike frequency', min: 0, max: 3, step: 0.1 },
-  { key: 'arcCount', label: 'Strike count', min: 0, max: 5, step: 1 },
-  { key: 'arcReach', label: 'Strike reach', min: 0.1, max: 2, step: 0.05 },
-  { key: 'arcDuration', label: 'Strike duration', min: 0.1, max: 3, step: 0.1 },
-  { key: 'arcBend', label: 'Strike bend', min: 0, max: 2, step: 0.1 },
+  { key: "scale", label: "Scale", min: 0.1, max: 0.8, step: 0.01 },
+  { key: "intensity", label: "Intensity", min: 0.1, max: 3, step: 0.1 },
+  { key: "glow", label: "Glow", min: 0, max: 3, step: 0.1 },
+  { key: "thickness", label: "Thickness", min: 0.5, max: 4, step: 0.1 },
+  { key: "strands", label: "Strands", min: 1, max: 6, step: 1 },
+  { key: "bend", label: "Bend", min: 0, max: 2, step: 0.1 },
+  { key: "crackle", label: "Crackle", min: 0, max: 3, step: 0.1 },
+  { key: "flicker", label: "Flicker", min: 0, max: 1, step: 0.05 },
+  { key: "fill", label: "Fill", min: 0, max: 1, step: 0.05 },
+  { key: "speed", label: "Speed", min: 0.1, max: 4, step: 0.1 },
+  { key: "arcs", label: "Strike frequency", min: 0, max: 3, step: 0.1 },
+  { key: "arcCount", label: "Strike count", min: 0, max: 5, step: 1 },
+  { key: "arcReach", label: "Strike reach", min: 0.1, max: 2, step: 0.05 },
+  { key: "arcDuration", label: "Strike duration", min: 0.1, max: 3, step: 0.1 },
+  { key: "arcBend", label: "Strike bend", min: 0, max: 2, step: 0.1 },
   {
-    key: 'arcIntensity',
-    label: 'Strike brightness',
+    key: "arcIntensity",
+    label: "Strike brightness",
     min: 0,
     max: 3,
     step: 0.1,
   },
-  { key: 'arcThickness', label: 'Strike width', min: 0.1, max: 3, step: 0.1 },
+  { key: "arcThickness", label: "Strike width", min: 0.1, max: 3, step: 0.1 },
 ] as const;
 
-export const Route = createFileRoute('/')({
+export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
     logoControls:
-      search.logoControls === '1' ||
+      search.logoControls === "1" ||
       search.logoControls === 1 ||
       search.logoControls === true
         ? true
@@ -47,22 +48,22 @@ export const Route = createFileRoute('/')({
   head: () => ({
     meta: [
       { title: TITLE },
-      { name: 'description', content: DESCRIPTION },
-      { property: 'og:title', content: TITLE },
-      { property: 'og:description', content: DESCRIPTION },
-      { property: 'og:url', content: SITE_URL },
-      { property: 'og:type', content: 'website' },
-      { property: 'og:image', content: OG_IMAGE },
-      { property: 'og:image:secure_url', content: OG_IMAGE },
-      { property: 'og:image:type', content: 'image/webp' },
-      { property: 'og:image:width', content: '1200' },
-      { property: 'og:image:height', content: '630' },
-      { property: 'og:image:alt', content: TITLE },
-      { name: 'twitter:card', content: 'summary_large_image' },
-      { name: 'twitter:title', content: TITLE },
-      { name: 'twitter:description', content: DESCRIPTION },
-      { name: 'twitter:image', content: OG_IMAGE },
-      { name: 'twitter:image:alt', content: TITLE },
+      { name: "description", content: DESCRIPTION },
+      { property: "og:title", content: TITLE },
+      { property: "og:description", content: DESCRIPTION },
+      { property: "og:url", content: SITE_URL },
+      { property: "og:type", content: "website" },
+      { property: "og:image", content: OG_IMAGE },
+      { property: "og:image:secure_url", content: OG_IMAGE },
+      { property: "og:image:type", content: "image/webp" },
+      { property: "og:image:width", content: "1200" },
+      { property: "og:image:height", content: "630" },
+      { property: "og:image:alt", content: TITLE },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: TITLE },
+      { name: "twitter:description", content: DESCRIPTION },
+      { name: "twitter:image", content: OG_IMAGE },
+      { name: "twitter:image:alt", content: TITLE },
     ],
   }),
 });

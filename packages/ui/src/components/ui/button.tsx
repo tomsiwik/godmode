@@ -27,7 +27,7 @@ const buttonVariants = cva('cursor-pointer inline-flex items-center justify-cent
     },
 })
 
-export interface ButtonProps extends React.ButtonHTMLAttributes<HTMLButtonElement>, VariantProps<typeof buttonVariants> {
+export interface ButtonProps extends Omit<React.ButtonHTMLAttributes<HTMLButtonElement>, 'color'>, VariantProps<typeof buttonVariants> {
     asChild?: boolean
 }
 

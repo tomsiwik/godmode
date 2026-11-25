@@ -1,4 +1,5 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="-1 -1 7 7" shape-rendering="crispEdges">
+  <title>godmode</title>
   <style>
     rect { fill: black; }
     @media (prefers-color-scheme: dark) {

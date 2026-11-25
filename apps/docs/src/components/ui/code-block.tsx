@@ -1,16 +1,16 @@
-import { cn } from '../../lib/cn';
-import { toJsxRuntime } from 'hast-util-to-jsx-runtime';
-import { type JSX, useLayoutEffect, useState } from 'react';
-import { Fragment, jsx, jsxs } from 'react/jsx-runtime';
-import type { BundledLanguage } from 'shiki/bundle/web';
+import { toJsxRuntime } from "hast-util-to-jsx-runtime";
+import { type JSX, useLayoutEffect, useState } from "react";
+import { Fragment, jsx, jsxs } from "react/jsx-runtime";
+import type { BundledLanguage } from "shiki/bundle/web";
+import { cn } from "../../lib/cn";
 
 const highlightCache = new Map();
 
-let shikiPromise: Promise<typeof import('shiki/bundle/web')> | null = null;
+let shikiPromise: Promise<typeof import("shiki/bundle/web")> | null = null;
 
 function getShiki() {
   if (!shikiPromise) {
-    shikiPromise = import('shiki/bundle/web');
+    shikiPromise = import("shiki/bundle/web");
   }
   return shikiPromise;
 }
@@ -26,8 +26,8 @@ export async function highlight(code: string, lang: BundledLanguage) {
   const hast = await codeToHast(code, {
     lang,
     themes: {
-      light: 'ayu-light',
-      dark: 'ayu-dark',
+      light: "ayu-light",
+      dark: "ayu-dark",
     },
     defaultColor: false,
   });
@@ -73,7 +73,7 @@ export default function CodeBlock({ code, lang, className }: Props) {
   return content ? (
     <div
       className={cn(
-        'overflow-auto no-scrollbar [&_code]:text-[13px]/5 [&_code]:font-mono [&_pre]:p-3 [&_pre]:leading-snug',
+        "overflow-auto no-scrollbar [&_code]:text-[13px]/5 [&_code]:font-mono [&_pre]:p-3 [&_pre]:leading-snug",
         className,
       )}
     >
