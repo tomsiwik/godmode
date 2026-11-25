@@ -1,6 +1,6 @@
 {
   "name": "@godmode-cli/claude-code-channels",
-  "version": "0.0.1",
+  "version": "0.0.2",
   "description": "Inter-session messaging for Claude Code instances",
   "type": "module",
   "license": "MIT",

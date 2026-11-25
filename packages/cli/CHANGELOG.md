@@ -1,5 +1,12 @@
 # godmode
 
+## 0.0.5
+
+### Patch Changes
+
+- b7a916d: Update runtime dependencies to patched releases and refresh the workspace tooling.
+  Correct the CLI's minimum Node.js version to 22.18, as required by its OpenAPI dependency.
+
 ## 0.0.4
 
 ### Patch Changes
