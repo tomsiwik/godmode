@@ -1,15 +1,15 @@
-'use client';
-import { useI18n } from 'fumadocs-ui/contexts/i18n';
-import { cn } from '../../lib/cn';
-import { type ComponentProps, useEffect, useRef, useState } from 'react';
-import { mergeRefs } from '../../lib/merge-refs';
-import { TocThumb, useTOCItems } from './index';
-import * as Primitive from 'fumadocs-core/toc';
+"use client";
+import { useTranslations } from "@fuma-translate/react";
+import * as Primitive from "fumadocs-core/toc";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
+import { cn } from "../../lib/cn";
+import { mergeRefs } from "../../lib/merge-refs";
+import { TocThumb, useTOCItems } from "./index";
 
-export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
+export function TOCItems({ ref, className, ...props }: ComponentProps<"div">) {
   const containerRef = useRef<HTMLDivElement>(null);
   const items = useTOCItems();
-  const { text } = useI18n();
+  const t = useTranslations();
   const primaryAnchor = Primitive.useActiveAnchor();
   const [clickedAnchor, setClickedAnchor] = useState<string | null>(null);
   const clickTimeRef = useRef(0);
@@ -35,7 +35,7 @@ export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
   if (items.length === 0)
     return (
       <div className="rounded-lg border bg-fd-card p-3 text-xs text-fd-muted-foreground">
-        {text.tocNoHeadings}
+        {t("No Headings")}
       </div>
     );
 
@@ -53,11 +53,16 @@ export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
       />
       <div
         ref={mergeRefs(ref, containerRef)}
-        className={cn('flex flex-col', className)}
+        className={cn("flex flex-col", className)}
         {...props}
       >
         {items.map((item) => (
-          <TOCItem key={item.url} item={item} primaryAnchor={effectivePrimary} onSelect={handleSelect} />
+          <TOCItem
+            key={item.url}
+            item={item}
+            primaryAnchor={effectivePrimary}
+            onSelect={handleSelect}
+          />
         ))}
       </div>
     </>
@@ -73,7 +78,7 @@ function TOCItem({
   primaryAnchor: string | undefined;
   onSelect: (anchor: string) => void;
 }) {
-  const anchor = item.url.replace('#', '');
+  const anchor = item.url.replace("#", "");
   const isPrimary = anchor === primaryAnchor;
 
   return (
@@ -81,13 +86,13 @@ function TOCItem({
       href={item.url}
       onClick={() => onSelect(anchor)}
       className={cn(
-        'prose py-1.5 max-xl:py-2.5 text-sm text-fd-muted-foreground transition-colors wrap-anywhere first:pt-0 last:pb-0',
+        "prose py-1.5 max-xl:py-2.5 text-sm text-fd-muted-foreground transition-colors wrap-anywhere first:pt-0 last:pb-0",
         isPrimary
-          ? 'text-fd-primary'
-          : 'data-[active=true]:text-fd-foreground/60',
-        item.depth <= 2 && 'ps-3',
-        item.depth === 3 && 'ps-6',
-        item.depth >= 4 && 'ps-8',
+          ? "text-fd-primary"
+          : "data-[active=true]:text-fd-foreground/60",
+        item.depth <= 2 && "ps-3",
+        item.depth === 3 && "ps-6",
+        item.depth >= 4 && "ps-8",
       )}
     >
       {item.title}

@@ -50,7 +50,12 @@ class Pixel {
   draw() {
     const centerOffset = this.maxSizeInteger * 0.5 - this.size * 0.5;
     this.ctx.fillStyle = this.color;
-    this.ctx.fillRect(this.x + centerOffset, this.y + centerOffset, this.size, this.size);
+    this.ctx.fillRect(
+      this.x + centerOffset,
+      this.y + centerOffset,
+      this.size,
+      this.size,
+    );
   }
 
   appear() {
@@ -85,10 +90,10 @@ class Pixel {
 }
 
 class PixelCanvas extends HTMLElement {
-  static register(tag = 'pixel-canvas') {
-    if (typeof window === 'undefined' || !('customElements' in window)) return;
+  static register(tag = "pixel-canvas") {
+    if (typeof window === "undefined" || !("customElements" in window)) return;
     if (customElements.get(tag)) return; // idempotent for HMR
-    customElements.define(tag, this);
+    customElements.define(tag, PixelCanvas);
   }
 
   static css = `
@@ -112,7 +117,7 @@ class PixelCanvas extends HTMLElement {
   private resizeObserver!: ResizeObserver;
 
   get colors(): string[] {
-    return this.dataset.colors?.split(',') ?? ['#f8fafc', '#f1f5f9', '#cbd5e1'];
+    return this.dataset.colors?.split(",") ?? ["#f8fafc", "#f1f5f9", "#cbd5e1"];
   }
 
   get gap(): number {
@@ -129,44 +134,48 @@ class PixelCanvas extends HTMLElement {
   }
 
   get noFocus(): boolean {
-    return this.hasAttribute('data-no-focus');
+    return this.hasAttribute("data-no-focus");
   }
 
   connectedCallback() {
-    const canvas = document.createElement('canvas');
+    const canvas = document.createElement("canvas");
     const sheet = new CSSStyleSheet();
 
     this._parent = this.parentNode as ParentNode & EventTarget;
-    this.shadowroot = this.attachShadow({ mode: 'open' });
+    this.shadowroot = this.attachShadow({ mode: "open" });
     sheet.replaceSync(PixelCanvas.css);
     this.shadowroot.adoptedStyleSheets = [sheet];
     this.shadowroot.append(canvas);
     this.canvas = canvas;
-    this.ctx = canvas.getContext('2d')!;
+    const context = canvas.getContext("2d");
+    if (!context) throw new Error("Canvas 2D context is unavailable");
+    this.ctx = context;
 
     this.timeInterval = 1000 / 60;
     this.timePrevious = performance.now();
-    this.reducedMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    this.reducedMotion = window.matchMedia(
+      "(prefers-reduced-motion: reduce)",
+    ).matches;
 
     this.init();
     this.resizeObserver = new ResizeObserver(() => this.init());
     this.resizeObserver.observe(this);
 
-    this._parent.addEventListener('mouseenter', this);
-    this._parent.addEventListener('mouseleave', this);
+    this._parent.addEventListener("mouseenter", this);
+    this._parent.addEventListener("mouseleave", this);
     if (!this.noFocus) {
-      this._parent.addEventListener('focusin', this);
-      this._parent.addEventListener('focusout', this);
+      this._parent.addEventListener("focusin", this);
+      this._parent.addEventListener("focusout", this);
     }
   }
 
   disconnectedCallback() {
     this.resizeObserver?.disconnect();
-    this._parent?.removeEventListener('mouseenter', this);
-    this._parent?.removeEventListener('mouseleave', this);
+    this._parent?.removeEventListener("mouseenter", this);
+    this._parent?.removeEventListener("mouseleave", this);
     if (!this.noFocus) {
-      this._parent?.removeEventListener('focusin', this);
-      this._parent?.removeEventListener('focusout', this);
+      this._parent?.removeEventListener("focusin", this);
+      this._parent?.removeEventListener("focusout", this);
     }
   }
 
@@ -175,24 +184,24 @@ class PixelCanvas extends HTMLElement {
     this[`on${event.type}`](event);
   }
 
-  onmouseenter() {
-    this.handleAnimation('appear');
-  }
-  onmouseleave() {
-    this.handleAnimation('disappear');
-  }
+  onmouseenter = () => {
+    this.handleAnimation("appear");
+  };
+  onmouseleave = () => {
+    this.handleAnimation("disappear");
+  };
   onfocusin(e: FocusEvent) {
     if ((e.currentTarget as Node)?.contains(e.relatedTarget as Node)) return;
-    this.handleAnimation('appear');
+    this.handleAnimation("appear");
   }
   onfocusout(e: FocusEvent) {
     if ((e.currentTarget as Node)?.contains(e.relatedTarget as Node)) return;
-    this.handleAnimation('disappear');
+    this.handleAnimation("disappear");
   }
 
-  handleAnimation(name: 'appear' | 'disappear') {
+  handleAnimation(name: "appear" | "disappear") {
     if (this.animation) cancelAnimationFrame(this.animation);
-    this.animate(name);
+    this.animatePixels(name);
   }
 
   init() {
@@ -216,15 +225,20 @@ class PixelCanvas extends HTMLElement {
   createPixels() {
     for (let x = 0; x < this.canvas.width; x += this.gap) {
       for (let y = 0; y < this.canvas.height; y += this.gap) {
-        const color = this.colors[Math.floor(Math.random() * this.colors.length)];
-        const delay = this.reducedMotion ? 0 : this.getDistanceToCanvasCenter(x, y);
-        this.pixels.push(new Pixel(this.canvas, this.ctx, x, y, color, this.speed, delay));
+        const color =
+          this.colors[Math.floor(Math.random() * this.colors.length)];
+        const delay = this.reducedMotion
+          ? 0
+          : this.getDistanceToCanvasCenter(x, y);
+        this.pixels.push(
+          new Pixel(this.canvas, this.ctx, x, y, color, this.speed, delay),
+        );
       }
     }
   }
 
-  animate(fnName: 'appear' | 'disappear') {
-    this.animation = requestAnimationFrame(() => this.animate(fnName));
+  private animatePixels(fnName: "appear" | "disappear") {
+    this.animation = requestAnimationFrame(() => this.animatePixels(fnName));
     const timeNow = performance.now();
     const timePassed = timeNow - this.timePrevious;
     if (timePassed < this.timeInterval) return;

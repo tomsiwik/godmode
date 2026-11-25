@@ -1,19 +1,19 @@
-import react from '@vitejs/plugin-react';
-import { tanstackStart } from '@tanstack/react-start/plugin/vite';
-import { defineConfig } from 'vite';
-import tailwindcss from '@tailwindcss/vite';
-import mdx from 'fumadocs-mdx/vite';
-import { nitro } from 'nitro/vite';
+import tailwindcss from "@tailwindcss/vite";
+import { tanstackStart } from "@tanstack/react-start/plugin/vite";
+import react from "@vitejs/plugin-react";
+import mdx from "fumadocs-mdx/vite";
+import { nitro } from "nitro/vite";
+import { defineConfig } from "vite";
 
-const isVercel = process.env.VERCEL === '1';
+const isVercel = process.env.VERCEL === "1";
 
 export default defineConfig({
   server: {
     port: Number(process.env.PORT) || 3000,
-    host: process.env.HOST || 'localhost',
+    host: process.env.HOST || "localhost",
   },
   plugins: [
-    mdx(await import('./source.config')),
+    mdx(await import("./source.config.ts")),
     tailwindcss(),
     tanstackStart(
       isVercel
@@ -30,11 +30,11 @@ export default defineConfig({
     ),
     react(),
     nitro({
-      preset: 'vercel',
+      preset: "vercel",
       vercel: {
         functions: {
-          runtime: 'nodejs22.x',
-          architecture: 'arm64',
+          runtime: "nodejs22.x",
+          architecture: "arm64",
           supportsResponseStreaming: true,
         },
       },
@@ -44,8 +44,8 @@ export default defineConfig({
       },
       minify: true,
       routeRules: {
-        '/assets/**': {
-          headers: { 'cache-control': 'public, max-age=31536000, immutable' },
+        "/assets/**": {
+          headers: { "cache-control": "public, max-age=31536000, immutable" },
         },
       },
     }),

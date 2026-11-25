@@ -1,15 +1,15 @@
-'use client';
-import * as Primitive from 'fumadocs-core/toc';
-import { type ComponentProps, useEffect, useRef, useState } from 'react';
-import { cn } from '../../lib/cn';
-import { TocThumb, useTOCItems } from './index';
-import { mergeRefs } from '../../lib/merge-refs';
-import { useI18n } from 'fumadocs-ui/contexts/i18n';
+"use client";
+import { useTranslations } from "@fuma-translate/react";
+import * as Primitive from "fumadocs-core/toc";
+import { type ComponentProps, useEffect, useRef, useState } from "react";
+import { cn } from "../../lib/cn";
+import { mergeRefs } from "../../lib/merge-refs";
+import { TocThumb, useTOCItems } from "./index";
 
-export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
+export function TOCItems({ ref, className, ...props }: ComponentProps<"div">) {
   const containerRef = useRef<HTMLDivElement>(null);
   const items = useTOCItems();
-  const { text } = useI18n();
+  const t = useTranslations();
 
   const [svg, setSvg] = useState<{
     path: string;
@@ -35,17 +35,20 @@ export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
         const styles = getComputedStyle(element);
         const offset = getLineOffset(items[i].depth) + 1,
           top = element.offsetTop + parseFloat(styles.paddingTop),
-          bottom = element.offsetTop + element.clientHeight - parseFloat(styles.paddingBottom);
+          bottom =
+            element.offsetTop +
+            element.clientHeight -
+            parseFloat(styles.paddingBottom);
 
         w = Math.max(offset, w);
         h = Math.max(h, bottom);
 
-        d.push(`${i === 0 ? 'M' : 'L'}${offset} ${top}`);
+        d.push(`${i === 0 ? "M" : "L"}${offset} ${top}`);
         d.push(`L${offset} ${bottom}`);
       }
 
       setSvg({
-        path: d.join(' '),
+        path: d.join(" "),
         width: w + 1,
         height: h,
       });
@@ -63,7 +66,7 @@ export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
   if (items.length === 0)
     return (
       <div className="rounded-lg border bg-fd-card p-3 text-xs text-fd-muted-foreground">
-        {text.tocNoHeadings}
+        {t("No Headings")}
       </div>
     );
 
@@ -89,7 +92,11 @@ export function TOCItems({ ref, className, ...props }: ComponentProps<'div'>) {
           />
         </div>
       )}
-      <div ref={mergeRefs(containerRef, ref)} className={cn('flex flex-col', className)} {...props}>
+      <div
+        ref={mergeRefs(containerRef, ref)}
+        className={cn("flex flex-col", className)}
+        {...props}
+      >
         {items.map((item, i) => (
           <TOCItem
             key={item.url}
@@ -136,6 +143,7 @@ function TOCItem({
     >
       {offset !== upperOffset && (
         <svg
+          aria-hidden="true"
           xmlns="http://www.w3.org/2000/svg"
           viewBox="0 0 16 16"
           className="absolute -top-1.5 start-0 size-4 rtl:-scale-x-100"
@@ -152,9 +160,9 @@ function TOCItem({
       )}
       <div
         className={cn(
-          'absolute inset-y-0 w-px bg-fd-foreground/10',
-          offset !== upperOffset && 'top-1.5',
-          offset !== lowerOffset && 'bottom-1.5',
+          "absolute inset-y-0 w-px bg-fd-foreground/10",
+          offset !== upperOffset && "top-1.5",
+          offset !== lowerOffset && "bottom-1.5",
         )}
         style={{
           insetInlineStart: offset,

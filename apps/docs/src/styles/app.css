@@ -25,27 +25,21 @@
   --color-fd-primary-foreground: oklch(0.15 0.04 295);
 }
 
+#nd-sidebar {
+  background-color: var(--color-background);
+}
+
+.scroll-m-20 {
+  scroll-margin-top: calc(var(--fd-scroll-offset, 0px) + var(--spacing) * 24);
+}
+.scroll-m-24 {
+  scroll-margin-top: calc(var(--fd-scroll-offset, 0px) + var(--spacing) * 28);
+}
+.scroll-m-28 {
+  scroll-margin-top: calc(var(--fd-scroll-offset, 0px) + var(--spacing) * 32);
+}
+
 @layer base {
-  #nd-sidebar {
-    background-color: var(--color-background) !important;
-  }
-
-  .scroll-m-20 {
-    scroll-margin-top: calc(
-      var(--fd-scroll-offset, 0px) + var(--spacing) * 24
-    ) !important;
-  }
-  .scroll-m-24 {
-    scroll-margin-top: calc(
-      var(--fd-scroll-offset, 0px) + var(--spacing) * 28
-    ) !important;
-  }
-  .scroll-m-28 {
-    scroll-margin-top: calc(
-      var(--fd-scroll-offset, 0px) + var(--spacing) * 32
-    ) !important;
-  }
-
   .line {
     padding-left: 0;
   }

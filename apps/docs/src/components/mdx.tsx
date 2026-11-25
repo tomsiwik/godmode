@@ -1,7 +1,7 @@
-import defaultMdxComponents from 'fumadocs-ui/mdx';
-import { Callout } from 'fumadocs-ui/components/callout';
-import type { MDXComponents } from 'mdx/types';
-import { InstallCommand } from './install-command';
+import { Callout } from "fumadocs-ui/components/callout";
+import defaultMdxComponents from "fumadocs-ui/mdx";
+import type { MDXComponents } from "mdx/types";
+import { InstallCommand } from "./install-command";
 
 export function getMDXComponents(components?: MDXComponents) {
   return {

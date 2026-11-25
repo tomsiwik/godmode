@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState } from "react";
 
 export interface InstallCommandProps {
   /** Command variants keyed by label. */
@@ -8,10 +8,10 @@ export interface InstallCommandProps {
 }
 
 const DEFAULT_COMMANDS = [
-  { label: 'npm', cmd: 'npm install -g godmode' },
-  { label: 'yarn', cmd: 'yarn global add godmode' },
-  { label: 'pnpm', cmd: 'pnpm install -g godmode' },
-  { label: 'bun', cmd: 'bun install -g godmode' },
+  { label: "npm", cmd: "npm install -g godmode" },
+  { label: "yarn", cmd: "yarn global add godmode" },
+  { label: "pnpm", cmd: "pnpm install -g godmode" },
+  { label: "bun", cmd: "bun install -g godmode" },
 ] as const;
 
 /**
@@ -20,7 +20,7 @@ const DEFAULT_COMMANDS = [
  */
 export function InstallCommand({
   commands = DEFAULT_COMMANDS,
-  className = '',
+  className = "",
 }: InstallCommandProps) {
   const [active, setActive] = useState(0);
   const [copied, setCopied] = useState(false);
@@ -43,8 +43,8 @@ export function InstallCommand({
             onClick={() => setActive(i)}
             className={`px-4 py-2 text-sm font-medium transition-colors ${
               i === active
-                ? 'text-fd-foreground bg-fd-background'
-                : 'text-fd-muted-foreground hover:text-fd-foreground'
+                ? "text-fd-foreground bg-fd-background"
+                : "text-fd-muted-foreground hover:text-fd-foreground"
             }`}
           >
             {c.label}
@@ -58,7 +58,7 @@ export function InstallCommand({
           onClick={copy}
           className="shrink-0 text-fd-muted-foreground hover:text-fd-foreground transition-colors text-xs"
         >
-          {copied ? 'Copied!' : 'Copy'}
+          {copied ? "Copied!" : "Copy"}
         </button>
       </div>
     </div>

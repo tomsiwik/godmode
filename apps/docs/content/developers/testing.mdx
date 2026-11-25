@@ -103,7 +103,7 @@ pnpm -r test --filter='!apps/*'           # everything except apps/
 
 GitHub Actions runs:
 
-- `pnpm -r test` on Node 20, 22 (current LTS pair) on Linux + macOS
+- `pnpm -r test` on Node 22.18+ and 24 on Linux + macOS
 - `pnpm test:compliance` on Linux only (the GNU tools are most reliable there)
 - `pnpm lint` and `pnpm types:check` workspace-wide
 

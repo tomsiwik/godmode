@@ -46,11 +46,11 @@
     "test": "vitest run"
   },
   "dependencies": {
-    "@hey-api/openapi-ts": "^0.97.0",
-    "@modelcontextprotocol/sdk": "^1.29.0",
+    "@hey-api/openapi-ts": "^0.99.0",
+    "@modelcontextprotocol/sdk": "^1.32.2",
     "fuzzysort": "^3.1.0",
     "prompts": "^2.4.2",
-    "yaml": "^2.8.4"
+    "yaml": "^2.9.1"
   },
   "devDependencies": {
     "@godmode-cli/cli": "workspace:*",
@@ -58,13 +58,13 @@
     "@godmode-cli/interface-api": "workspace:*",
     "@godmode-cli/interface-graphql": "workspace:*",
     "@godmode-cli/interface-mcp": "workspace:*",
-    "@types/node": "^25.6.0",
+    "@types/node": "^25.9.9",
     "@types/prompts": "^2.4.9",
     "tsup": "^8.5.1",
     "typescript": "^6.0.3",
-    "vitest": "^4.1.5"
+    "vitest": "^4.1.12"
   },
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=22.18.0"
   }
 }
